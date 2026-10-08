@@ -851,6 +851,9 @@ function wireEvents() {
 
 function init() {
   Store.notify = toast;
+  window.addEventListener('pagehide', () => {
+    if (typeof Store.flushNow === 'function') Store.flushNow();
+  });
   const versionLabel = document.getElementById('appVersionLabel');
   if (versionLabel) {
     const v = window.ledger && window.ledger.appVersion;

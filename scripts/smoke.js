@@ -356,7 +356,10 @@ out.ui.rowsNav = { rowCount, hl, any: hl === 1 && rowCount >= 2 };
     } catch (e) { out.error = String(e) + ' @@ ' + String((e && e.stack) || ''); }
     out.accounts = Store.db.accounts.length;
     out.vouchers = Store.db.vouchers.length;
-    return out;
+    return (async () => {
+      if (typeof Store.flushNow === 'function') await Store.flushNow();
+      return out;
+    })();
   })()`);
 
   if (info.error) failures.push('renderer check threw: ' + info.error);

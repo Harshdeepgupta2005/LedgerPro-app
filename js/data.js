@@ -53,6 +53,9 @@ const Store = {
   backend: 'localstorage',
   seqs: { voucher: 0, account: 0 },
   notify: null,
+  flushDelay: 200,
+  _dirty: false,
+  _flushTimer: null,
 
   hasDiskBackend() {
     return typeof window !== 'undefined' && window.ledger && typeof window.ledger.dbSave === 'function';
@@ -127,19 +130,40 @@ const Store = {
 
   save() {
     this.rebuildSeqs();
+    this._dirty = true;
+    if (this._flushTimer) clearTimeout(this._flushTimer);
+    this._flushTimer = setTimeout(() => this.flushNow(), this.flushDelay);
+    return true;
+  },
+
+  flushNow() {
+    if (this._flushTimer) {
+      clearTimeout(this._flushTimer);
+      this._flushTimer = null;
+    }
+    if (!this._dirty) return Promise.resolve(true);
+    this._dirty = false;
     if (this.hasDiskBackend()) {
-      const res = window.ledger.dbSave(this.db);
-      if (res && res.ok) {
-        clearBackup();
-        this.backend = 'sqlite';
-        return true;
-      }
-      this.backend = 'localstorage';
-      this.warn('Could not write to the database — changes are being kept in browser storage.', 'error');
-      return writeBackup(this.db);
+      return window.ledger
+        .dbSave(this.db)
+        .then((res) => {
+          if (res && res.ok) {
+            clearBackup();
+            this.backend = 'sqlite';
+            return true;
+          }
+          this.backend = 'localstorage';
+          this.warn('Could not write to the database — changes are being kept in browser storage.', 'error');
+          return writeBackup(this.db);
+        })
+        .catch((e) => {
+          this.backend = 'localstorage';
+          this.warn('Could not write to the database — changes are being kept in browser storage.', 'error');
+          return writeBackup(this.db);
+        });
     }
     this.backend = 'localstorage';
-    return writeBackup(this.db);
+    return Promise.resolve(writeBackup(this.db));
   },
 
   reset() {

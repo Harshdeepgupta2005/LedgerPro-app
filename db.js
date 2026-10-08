@@ -64,9 +64,30 @@ function metaGet(key) {
   return row ? row.value : null;
 }
 
+function metaSet(key, value) {
+  db.prepare(
+    'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  ).run(String(key), String(value));
+}
+
+const MIGRATIONS = {
+  2: function migrateTo2() {
+    if (!hasColumn('vouchers', 'created_at')) {
+      db.exec("ALTER TABLE vouchers ADD COLUMN created_at TEXT NOT NULL DEFAULT ''");
+    }
+  },
+};
+
 function migrate() {
-  if (hasColumn('vouchers', 'created_at')) return;
-  db.exec("ALTER TABLE vouchers ADD COLUMN created_at TEXT NOT NULL DEFAULT ''");
+  let current = Number(metaGet('schemaVersion')) || 1;
+  const target = Number(SCHEMA_VERSION);
+  while (current < target) {
+    const next = String(current + 1);
+    const step = MIGRATIONS[next];
+    if (typeof step === 'function') step();
+    metaSet('schemaVersion', next);
+    current += 1;
+  }
 }
 
 function open() {
@@ -157,23 +178,36 @@ function save(doc) {
   const vouchers = Array.isArray(doc.vouchers) ? doc.vouchers : null;
   if (!accounts || !vouchers) throw new Error('Invalid document: accounts/vouchers must be arrays');
 
-  const insertAccount = db.prepare(
-    'INSERT INTO accounts (id, name, group_name, type, opening) VALUES (?, ?, ?, ?, ?)'
+  const upsertAccount = db.prepare(
+    `INSERT INTO accounts (id, name, group_name, type, opening) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET name = excluded.name, group_name = excluded.group_name,
+       type = excluded.type, opening = excluded.opening`
   );
-  const insertVoucher = db.prepare(
-    'INSERT INTO vouchers (id, no, date, type, dr, cr, amount, narration, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  );
-  const setMeta = db.prepare(
-    'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  const upsertVoucher = db.prepare(
+    `INSERT INTO vouchers (id, no, date, type, dr, cr, amount, narration, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET no = excluded.no, date = excluded.date, type = excluded.type,
+       dr = excluded.dr, cr = excluded.cr, amount = excluded.amount, narration = excluded.narration,
+       created_at = CASE WHEN excluded.created_at = '' THEN vouchers.created_at ELSE excluded.created_at END`
   );
 
   const seqs = doc.seqs && typeof doc.seqs === 'object' ? doc.seqs : {};
 
+  const deleteNotIn = (table, ids) => {
+    if (ids.length === 0) {
+      db.prepare(`DELETE FROM ${table}`).run();
+      return;
+    }
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += 500) chunks.push(ids.slice(i, i + 500));
+    for (const chunk of chunks) {
+      const placeholders = chunk.map(() => '?').join(',');
+      db.prepare(`DELETE FROM ${table} WHERE id NOT IN (${placeholders})`).run(...chunk);
+    }
+  };
+
   db.transaction(() => {
-    db.prepare('DELETE FROM accounts').run();
-    db.prepare('DELETE FROM vouchers').run();
     for (const a of accounts) {
-      insertAccount.run(
+      upsertAccount.run(
         String(a.id),
         String(a.name),
         String(a.group || 'Assets'),
@@ -181,8 +215,12 @@ function save(doc) {
         Number(a.opening) || 0
       );
     }
+    deleteNotIn(
+      'accounts',
+      accounts.map((a) => String(a.id))
+    );
     for (const v of vouchers) {
-      insertVoucher.run(
+      upsertVoucher.run(
         String(v.id),
         String(v.no ?? ''),
         String(v.date ?? ''),
@@ -194,11 +232,15 @@ function save(doc) {
         String(v.createdAt ?? '')
       );
     }
-    setMeta.run('initialized', '1');
-    setMeta.run('savedAt', new Date().toISOString());
-    setMeta.run('schemaVersion', SCHEMA_VERSION);
-    setMeta.run('nextVoucherSeq', String(Number(seqs.voucher) || 0));
-    setMeta.run('nextAccountSeq', String(Number(seqs.account) || 0));
+    deleteNotIn(
+      'vouchers',
+      vouchers.map((v) => String(v.id))
+    );
+    metaSet('initialized', '1');
+    metaSet('savedAt', new Date().toISOString());
+    metaSet('schemaVersion', SCHEMA_VERSION);
+    metaSet('nextVoucherSeq', String(Number(seqs.voucher) || 0));
+    metaSet('nextAccountSeq', String(Number(seqs.account) || 0));
   })();
   return { ok: true, accounts: accounts.length, vouchers: vouchers.length };
 }

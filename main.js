@@ -39,11 +39,11 @@ ipcMain.on('db:load', (event) => {
   }
 });
 
-ipcMain.on('db:save', (event, doc) => {
+ipcMain.handle('db:save', async (event, doc) => {
   try {
-    event.returnValue = db.save(doc);
+    return db.save(doc);
   } catch (e) {
-    event.returnValue = { ok: false, error: String((e && e.message) || e) };
+    return { ok: false, error: String((e && e.message) || e) };
   }
 });
 
