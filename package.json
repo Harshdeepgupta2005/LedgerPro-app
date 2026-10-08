@@ -16,6 +16,7 @@
     "format": "prettier --write db.js preload.js main.js js/*.js scripts/*.js css/styles.css index.html",
     "format:check": "prettier --check db.js preload.js main.js js/*.js scripts/*.js css/styles.css index.html",
     "test": "node --test test/",
+    "test:persistence": "electron scripts/test-persistence.js",
     "release": "bash scripts/release.sh",
     "rebuild:electron": "cd node_modules/better-sqlite3 && ../../node_modules/.bin/node-gyp rebuild --release --target=33.4.11 --arch=arm64 --runtime=electron --dist-url=https://electronjs.org/headers"
   },

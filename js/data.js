@@ -4,78 +4,163 @@
 */
 
 const DB_KEY = 'ledgerpro.db.v1';
+const BACKUP_V = 2;
+
+function readBackup() {
+  try {
+    const raw = localStorage.getItem(DB_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      parsed.v === BACKUP_V &&
+      parsed.db &&
+      Array.isArray(parsed.db.accounts) &&
+      Array.isArray(parsed.db.vouchers)
+    ) {
+      return { db: parsed.db, savedAt: String(parsed.savedAt || '') };
+    }
+    if (parsed && Array.isArray(parsed.accounts) && Array.isArray(parsed.vouchers)) {
+      return { db: parsed, savedAt: '' };
+    }
+    return null;
+  } catch (e) {
+    console.error('Failed to parse backup data', e);
+    return null;
+  }
+}
+
+function writeBackup(db) {
+  try {
+    localStorage.setItem(DB_KEY, JSON.stringify({ v: BACKUP_V, db, savedAt: new Date().toISOString() }));
+    return true;
+  } catch (e) {
+    console.error('Failed to save data', e);
+    return false;
+  }
+}
+
+function clearBackup() {
+  try {
+    localStorage.removeItem(DB_KEY);
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function leadingNumber(id) {
+  const m = String(id).match(/^\D*(\d+)/);
+  return m ? parseInt(m[1], 10) || 0 : 0;
+}
 
 const Store = {
   db: null,
+  backend: 'localstorage',
+  seqs: { voucher: 0, account: 0 },
+  notify: null,
 
   hasDiskBackend() {
     return typeof window !== 'undefined' && window.ledger && typeof window.ledger.dbSave === 'function';
   },
 
+  rebuildSeqs() {
+    const vMax = Math.max(0, ...this.db.vouchers.map((x) => leadingNumber(x.id)));
+    const aMax = Math.max(0, ...this.db.accounts.map((x) => leadingNumber(x.id)));
+    this.db.seqs = {
+      voucher: Math.max(this.db.seqs && this.db.seqs.voucher ? this.db.seqs.voucher : 0, vMax),
+      account: Math.max(this.db.seqs && this.db.seqs.account ? this.db.seqs.account : 0, aMax),
+    };
+    this.seqs = this.db.seqs;
+  },
+
   load() {
     if (this.hasDiskBackend()) {
       const res = window.ledger.dbLoad();
-      if (res && res.ok && res.doc && Array.isArray(res.doc.accounts) && Array.isArray(res.doc.vouchers)) {
-        this.db = res.doc;
-        try {
-          localStorage.removeItem(DB_KEY);
-        } catch (e) {
-          /* ignore */
+      if (res && res.ok) {
+        const doc = res.doc;
+        if (doc && Array.isArray(doc.accounts) && Array.isArray(doc.vouchers)) {
+          const local = readBackup();
+          if (doc.initialized) {
+            if (local && local.savedAt && doc.savedAt && local.savedAt > doc.savedAt) {
+              this.db = local.db;
+              this.backend = 'localstorage';
+              this.rebuildSeqs();
+              this.warn('You had unsaved local changes — they have been restored.', 'error');
+              return this.db;
+            }
+            this.db = doc;
+            this.backend = 'sqlite';
+            clearBackup();
+            this.rebuildSeqs();
+            return this.db;
+          }
+          if (local) {
+            this.db = local.db;
+            this.backend = 'sqlite';
+            this.rebuildSeqs();
+            this.save();
+            return this.db;
+          }
+          this.db = seedSampleData();
+          this.rebuildSeqs();
+          this.save();
+          return this.db;
         }
-        return this.db;
       }
       if (res && !res.ok) console.error('SQLite load failed', res.error);
     }
 
-    let legacy = null;
-    try {
-      const raw = localStorage.getItem(DB_KEY);
-      if (raw) legacy = JSON.parse(raw);
-    } catch (e) {
-      console.error('Failed to load data', e);
-    }
-
-    if (legacy && Array.isArray(legacy.accounts) && Array.isArray(legacy.vouchers)) {
-      this.db = legacy;
+    const legacy = readBackup();
+    if (legacy) {
+      this.db = legacy.db;
+      this.backend = 'sqlite';
+      this.rebuildSeqs();
       this.save();
       return this.db;
     }
 
     this.db = seedSampleData();
+    this.rebuildSeqs();
     this.save();
     return this.db;
   },
 
+  warn(message, type = 'error') {
+    if (typeof this.notify === 'function') this.notify(message, type);
+    console.warn(message);
+  },
+
   save() {
+    this.rebuildSeqs();
     if (this.hasDiskBackend()) {
       const res = window.ledger.dbSave(this.db);
       if (res && res.ok) {
-        try {
-          localStorage.removeItem(DB_KEY);
-        } catch (e) {
-          /* ignore */
-        }
+        clearBackup();
+        this.backend = 'sqlite';
         return true;
       }
-      console.error('SQLite save failed, keeping a localStorage fallback', res && res.error);
+      this.backend = 'localstorage';
+      this.warn('Could not write to the database — changes are being kept in browser storage.', 'error');
+      return writeBackup(this.db);
     }
-    try {
-      localStorage.setItem(DB_KEY, JSON.stringify(this.db));
-    } catch (e) {
-      console.error('Failed to save data', e);
-      return false;
-    }
-    return true;
+    this.backend = 'localstorage';
+    return writeBackup(this.db);
   },
 
   reset() {
     this.db = seedSampleData();
+    this.rebuildSeqs();
     this.save();
     return this.db;
   },
 
   clear() {
-    this.db = { accounts: [], vouchers: [] };
+    this.db = {
+      accounts: [],
+      vouchers: [],
+      seqs: { voucher: this.seqs.voucher, account: this.seqs.account },
+    };
+    this.rebuildSeqs();
     this.save();
     return this.db;
   },
@@ -121,10 +206,12 @@ const Store = {
     return no;
   },
 
+  nextVoucherId() {
+    return 'v' + String(++this.db.seqs.voucher);
+  },
+
   nextAccountId() {
-    let n = 1;
-    while (this.db.accounts.some((a) => a.id === 'acc' + n)) n++;
-    return 'acc' + n;
+    return 'acc' + String(++this.db.seqs.account);
   },
 
   renumberAll() {
@@ -261,6 +348,7 @@ function seedSampleData() {
     return {
       id: 'v' + (i + 1),
       no: `${prefix}-${String(counters[v.type]).padStart(4, '0')}`,
+      createdAt: new Date(Date.UTC(2026, 0, 1 + i)).toISOString(),
       ...v,
     };
   });

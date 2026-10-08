@@ -254,7 +254,7 @@ function submitEntry() {
     resetEntryForm();
     renderCurrent();
   } else {
-    const saved = { id: 'v' + Date.now(), ...payload };
+    const saved = { id: Store.nextVoucherId(), ...payload };
     Store.addVoucher(saved);
     state.lastSaved = { id: saved.id, no, amount };
     if (state.lastSavedTimer) clearTimeout(state.lastSavedTimer);
@@ -829,6 +829,7 @@ function wireEvents() {
 }
 
 function init() {
+  Store.notify = toast;
   const versionLabel = document.getElementById('appVersionLabel');
   if (versionLabel) {
     const v = window.ledger && window.ledger.appVersion;

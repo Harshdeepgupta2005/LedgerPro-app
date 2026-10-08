@@ -3,16 +3,25 @@ const fs = require('fs');
 const { app } = require('electron');
 const Database = require('better-sqlite3');
 
-const SCHEMA_VERSION = '1';
+const SCHEMA_VERSION = '2';
 const BACKUP_KEEP = 5;
 
 let db = null;
 let backupDir = null;
 
+let lastStamp = '';
+let backupSeq = 0;
+
 function stamp() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const name = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  if (name === lastStamp) backupSeq++;
+  else {
+    lastStamp = name;
+    backupSeq = 0;
+  }
+  return backupSeq ? `${name}-${backupSeq}` : name;
 }
 
 function makeBackup() {
@@ -25,7 +34,7 @@ function makeBackup() {
     if (!rows.a && !rows.v) return;
     const target = path.join(backupDir, `ledger-${stamp()}.db`);
     db.prepare('VACUUM INTO ?').run(target);
-    const files = fs.readdirSync(backupDir).filter((f) => /^ledger-\d{8}-\d{6}\.db$/.test(f));
+    const files = fs.readdirSync(backupDir).filter((f) => /^ledger-\d{8}-\d{6}(-\d+)?\.db$/.test(f));
     if (files.length > BACKUP_KEEP) {
       files
         .sort()
@@ -41,6 +50,23 @@ function makeBackup() {
   } catch (e) {
     console.error('Backup failed', e);
   }
+}
+
+function hasColumn(table, column) {
+  return db
+    .prepare(`PRAGMA table_info(${table})`)
+    .all()
+    .some((c) => c.name === column);
+}
+
+function metaGet(key) {
+  const row = db.prepare('SELECT value FROM meta WHERE key = ?').get(String(key));
+  return row ? row.value : null;
+}
+
+function migrate() {
+  if (hasColumn('vouchers', 'created_at')) return;
+  db.exec("ALTER TABLE vouchers ADD COLUMN created_at TEXT NOT NULL DEFAULT ''");
 }
 
 function open() {
@@ -71,17 +97,21 @@ function open() {
       dr TEXT NOT NULL DEFAULT '',
       cr TEXT NOT NULL DEFAULT '',
       amount REAL NOT NULL DEFAULT 0,
-      narration TEXT NOT NULL DEFAULT ''
+      narration TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS idx_vouchers_date ON vouchers(date);
     CREATE INDEX IF NOT EXISTS idx_vouchers_type ON vouchers(type);
+    CREATE INDEX IF NOT EXISTS idx_accounts_group ON accounts(group_name);
   `);
+  migrate();
   db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?) ON CONFLICT(key) DO NOTHING").run(
     SCHEMA_VERSION
   );
   db.prepare("INSERT INTO meta (key, value) VALUES ('createdAt', ?) ON CONFLICT(key) DO NOTHING").run(
     new Date().toISOString()
   );
+  db.prepare("UPDATE meta SET value = ? WHERE key = 'schemaVersion'").run(SCHEMA_VERSION);
   makeBackup();
 }
 
@@ -92,7 +122,9 @@ function load() {
     .all()
     .map((r) => ({ id: r.id, name: r.name, group: r.group_name, type: r.type, opening: r.opening }));
   const vouchers = db
-    .prepare('SELECT id, no, date, type, dr, cr, amount, narration FROM vouchers ORDER BY date, id')
+    .prepare(
+      'SELECT id, no, date, type, dr, cr, amount, narration, created_at FROM vouchers ORDER BY date, id'
+    )
     .all()
     .map((r) => ({
       id: r.id,
@@ -103,9 +135,19 @@ function load() {
       cr: r.cr,
       amount: r.amount,
       narration: r.narration,
+      createdAt: r.created_at || '',
     }));
-  if (!accounts.length && !vouchers.length) return null;
-  return { accounts, vouchers };
+  const initialized = metaGet('initialized') === '1';
+  const savedAt = metaGet('savedAt') || '';
+  const vSeq = Number(metaGet('nextVoucherSeq')) || 0;
+  const aSeq = Number(metaGet('nextAccountSeq')) || 0;
+  return {
+    accounts,
+    vouchers,
+    initialized,
+    savedAt,
+    seqs: { voucher: vSeq, account: aSeq },
+  };
 }
 
 function save(doc) {
@@ -119,11 +161,13 @@ function save(doc) {
     'INSERT INTO accounts (id, name, group_name, type, opening) VALUES (?, ?, ?, ?, ?)'
   );
   const insertVoucher = db.prepare(
-    'INSERT INTO vouchers (id, no, date, type, dr, cr, amount, narration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO vouchers (id, no, date, type, dr, cr, amount, narration, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const setMeta = db.prepare(
     'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   );
+
+  const seqs = doc.seqs && typeof doc.seqs === 'object' ? doc.seqs : {};
 
   db.transaction(() => {
     db.prepare('DELETE FROM accounts').run();
@@ -146,11 +190,15 @@ function save(doc) {
         String(v.dr ?? ''),
         String(v.cr ?? ''),
         Number(v.amount) || 0,
-        String(v.narration ?? '')
+        String(v.narration ?? ''),
+        String(v.createdAt ?? '')
       );
     }
+    setMeta.run('initialized', '1');
     setMeta.run('savedAt', new Date().toISOString());
     setMeta.run('schemaVersion', SCHEMA_VERSION);
+    setMeta.run('nextVoucherSeq', String(Number(seqs.voucher) || 0));
+    setMeta.run('nextAccountSeq', String(Number(seqs.account) || 0));
   })();
   return { ok: true, accounts: accounts.length, vouchers: vouchers.length };
 }
