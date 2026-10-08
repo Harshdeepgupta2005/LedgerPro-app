@@ -353,7 +353,7 @@ out.ui.rowsNav = { rowCount, hl, any: hl === 1 && rowCount >= 2 };
         if (kv[0] && kv[0].textContent === 'Version') out.about = kv[1].textContent;
         if (kv[0] && kv[0].textContent === 'Storage') out.storage = kv[1].textContent;
       });
-    } catch (e) { out.error = String(e); }
+    } catch (e) { out.error = String(e) + ' @@ ' + String((e && e.stack) || ''); }
     out.accounts = Store.db.accounts.length;
     out.vouchers = Store.db.vouchers.length;
     return out;

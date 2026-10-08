@@ -48,11 +48,6 @@ function clearBackup() {
   }
 }
 
-function leadingNumber(id) {
-  const m = String(id).match(/^\D*(\d+)/);
-  return m ? parseInt(m[1], 10) || 0 : 0;
-}
-
 const Store = {
   db: null,
   backend: 'localstorage',
@@ -175,19 +170,9 @@ const Store = {
   },
 
   balanceOf(id, opts = {}) {
-    if (opts === null || opts === undefined) opts = {};
+    opts = opts || {};
     const a = this.account(id);
-    if (!a) return 0;
-    let dr = 0;
-    let cr = 0;
-    for (const v of this.db.vouchers) {
-      if (opts.from && v.date < opts.from) continue;
-      if (opts.to && v.date > opts.to) continue;
-      if (v.dr === id) dr += v.amount;
-      if (v.cr === id) cr += v.amount;
-    }
-    const debitNormal = a.group === 'Assets' || a.group === 'Expenses';
-    return (Number(a.opening) || 0) + (debitNormal ? dr - cr : cr - dr);
+    return accountBalance(this.db.vouchers, a || { id, opening: 0, group: '' }, opts);
   },
 
   vouchersInPeriod(from, to) {
@@ -195,15 +180,7 @@ const Store = {
   },
 
   nextVoucherNo(type) {
-    const prefix = { Payment: 'PAY', Receipt: 'RCP', Contra: 'CNTR', Journal: 'JRN' }[type] || 'VCH';
-    const used = new Set(this.db.vouchers.filter((v) => v.type === type).map((v) => v.no));
-    let n = 1;
-    let no;
-    do {
-      no = `${prefix}-${String(n).padStart(4, '0')}`;
-      n++;
-    } while (used.has(no));
-    return no;
+    return nextVoucherNo(this.db.vouchers, type);
   },
 
   nextVoucherId() {

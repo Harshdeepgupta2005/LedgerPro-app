@@ -84,10 +84,6 @@ function activateRowNav(row) {
   if (v) startEditVoucher(v);
 }
 
-function monthKey(dateStr) {
-  return dateStr.slice(0, 7);
-}
-
 function monthlyFigures() {
   let income = 0;
   let expense = 0;
@@ -102,15 +98,6 @@ function monthlyFigures() {
     if (dr && dr.group === 'Expenses') expense += v.amount;
   }
   return { income, expense };
-}
-
-function thisMonthKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function isDebitNormal(a) {
-  return a.group === 'Assets' || a.group === 'Expenses';
 }
 
 /* ---------- Dashboard ---------- */
@@ -260,59 +247,6 @@ const TYPE_META = {
   },
   Journal: { dr: 'Debit account (Dr)', cr: 'Credit account (Cr)' },
 };
-
-function numToWords(num) {
-  const abs = Math.abs(num);
-  const rupees = Math.floor(abs);
-  const paise = Math.round((abs - rupees) * 100);
-  let words = rupees > 0 ? rupeesInWords(rupees) : 'Zero';
-  if (paise > 0) words += ` and ${rupeesInWords(paise)} Paise`;
-  return words;
-}
-
-function rupeesInWords(n) {
-  if (n === 0) return 'Zero';
-  const a = [
-    '',
-    'One',
-    'Two',
-    'Three',
-    'Four',
-    'Five',
-    'Six',
-    'Seven',
-    'Eight',
-    'Nine',
-    'Ten',
-    'Eleven',
-    'Twelve',
-    'Thirteen',
-    'Fourteen',
-    'Fifteen',
-    'Sixteen',
-    'Seventeen',
-    'Eighteen',
-    'Nineteen',
-  ];
-  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-  const two = (x) => (x < 20 ? a[x] : b[Math.floor(x / 10)] + (x % 10 ? ' ' + a[x % 10] : ''));
-  const three = (x) =>
-    (x >= 100 ? a[Math.floor(x / 100)] + ' Hundred' + (x % 100 ? ' ' : '') : '') +
-    (x % 100 ? two(x % 100) : '');
-
-  let out = '';
-  const crore = Math.floor(n / 10000000);
-  n %= 10000000;
-  const lakh = Math.floor(n / 100000);
-  n %= 100000;
-  const thousand = Math.floor(n / 1000);
-  n %= 1000;
-  if (crore) out += three(crore) + ' Crore ';
-  if (lakh) out += two(lakh) + ' Lakh ';
-  if (thousand) out += two(thousand) + ' Thousand ';
-  if (n) out += three(n);
-  return out.trim();
-}
 
 function isLiquid(a) {
   return a.type === 'Cash' || a.type === 'Bank';
