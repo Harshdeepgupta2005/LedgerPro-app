@@ -444,6 +444,10 @@ textarea {
   padding: 0;
 }
 
+.search-clear[hidden] {
+  display: none;
+}
+
 .search-clear:hover {
   background: var(--surface-2);
   color: var(--ink-2);
@@ -452,10 +456,6 @@ textarea {
 .search-clear svg {
   width: 13px;
   height: 13px;
-}
-
-.search.hidden {
-  visibility: hidden;
 }
 
 .global-results {
@@ -1396,6 +1396,17 @@ textarea {
   border-top: none;
 }
 
+#reportBody .off-balance {
+  margin-top: 14px;
+  background: var(--red-soft);
+  color: var(--red-ink);
+  font-size: 12.5px;
+  font-weight: 650;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(240, 68, 56, 0.3);
+}
+
 tr[data-ledger] {
   cursor: pointer;
 }
@@ -1622,6 +1633,10 @@ tr[data-ledger] {
   display: flex;
   flex-direction: column;
   gap: 7px;
+}
+
+.field[hidden] {
+  display: none;
 }
 
 .field > span {

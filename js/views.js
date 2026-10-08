@@ -89,18 +89,24 @@ function monthKey(dateStr) {
 }
 
 function monthlyFigures() {
-  const now = new Date();
-  const thisKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   let income = 0;
   let expense = 0;
+  const scope = state.period || {};
   for (const v of Store.db.vouchers) {
+    if (scope.from && v.date < scope.from) continue;
+    if (scope.to && v.date > scope.to) continue;
+    if (!state.period && monthKey(v.date) !== thisMonthKey()) continue;
     const dr = Store.account(v.dr);
     const cr = Store.account(v.cr);
-    if (monthKey(v.date) !== thisKey) continue;
     if (cr && cr.group === 'Income') income += v.amount;
     if (dr && dr.group === 'Expenses') expense += v.amount;
   }
   return { income, expense };
+}
+
+function thisMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function isDebitNormal(a) {
@@ -111,6 +117,7 @@ function isDebitNormal(a) {
 
 function renderDashboard() {
   const { income, expense } = monthlyFigures();
+  const statsSub = state.period ? 'In selected period' : 'This month';
   const liquid = Store.db.accounts
     .filter((a) => a.type === 'Cash' || a.type === 'Bank')
     .reduce((sum, a) => sum + Store.balanceOf(a.id), 0);
@@ -130,7 +137,7 @@ function renderDashboard() {
         <span class="stat-icon tint-green">${ICONS.arrowDown}</span>
       </div>
       <div class="stat-value text-green">${fmtCompact(income)}</div>
-      <div class="stat-sub">This month</div>
+      <div class="stat-sub">${statsSub}</div>
     </div>
     <div class="stat">
       <div class="stat-top">
@@ -138,7 +145,7 @@ function renderDashboard() {
         <span class="stat-icon tint-red">${ICONS.arrowUp}</span>
       </div>
       <div class="stat-value text-red">${fmtCompact(expense)}</div>
-      <div class="stat-sub">This month</div>
+      <div class="stat-sub">${statsSub}</div>
     </div>
     <div class="stat">
       <div class="stat-top">
@@ -146,7 +153,7 @@ function renderDashboard() {
         <span class="stat-icon tint-indigo">${ICONS.chart}</span>
       </div>
       <div class="stat-value ${income - expense >= 0 ? 'text-green' : 'text-red'}">${fmtCompact(income - expense)}</div>
-      <div class="stat-sub">Income − expenses, this month</div>
+      <div class="stat-sub">${statsSub}</div>
     </div>`;
 
   renderChart();
@@ -255,7 +262,15 @@ const TYPE_META = {
 };
 
 function numToWords(num) {
-  let n = Math.floor(Math.abs(num));
+  const abs = Math.abs(num);
+  const rupees = Math.floor(abs);
+  const paise = Math.round((abs - rupees) * 100);
+  let words = rupees > 0 ? rupeesInWords(rupees) : 'Zero';
+  if (paise > 0) words += ` and ${rupeesInWords(paise)} Paise`;
+  return words;
+}
+
+function rupeesInWords(n) {
   if (n === 0) return 'Zero';
   const a = [
     '',
@@ -576,7 +591,7 @@ function activateGlobalResult() {
   }
   if (row.dataset.resultVoucher) {
     hideGlobalResults();
-    showView('register');
+    startEditVoucher(row.dataset.resultVoucher);
   }
 }
 
@@ -587,7 +602,7 @@ function hideGlobalResults() {
     box.innerHTML = '';
   }
   const clear = $('#searchClear');
-  if (clear) clear.hidden = true;
+  if (clear) clear.hidden = !state.search;
   state.resultIndex = 0;
 }
 
@@ -718,7 +733,8 @@ function renderVoucherEntry() {
     const id = f[side + 'Id'].value;
     if (id && !Store.account(id)) setSide(side, '');
   }
-  if ((!f.drId.value || !f.crId.value) && Store.db.accounts.length) {
+  const hasUncommitted = (f.dr.value.trim() && !f.drId.value) || (f.cr.value.trim() && !f.crId.value);
+  if ((!f.drId.value || !f.crId.value) && Store.db.accounts.length && !hasUncommitted) {
     syncLedgerFields({ preserve: true });
   }
 
@@ -1041,23 +1057,39 @@ function renderTrialBalance() {
     </div>`;
 }
 
+function periodFlows(range) {
+  const flows = {};
+  const entry = (id) => flows[id] || (flows[id] = { dr: 0, cr: 0 });
+  for (const v of Store.db.vouchers) {
+    if (range && range.from && v.date < range.from) continue;
+    if (range && range.to && v.date > range.to) continue;
+    entry(v.dr).dr += v.amount;
+    entry(v.cr).cr += v.amount;
+  }
+  return flows;
+}
+
 function plFigures(range) {
+  const flows = periodFlows(range);
   let income = 0;
   let expense = 0;
   for (const a of Store.db.accounts) {
-    if (a.group === 'Income') income += Store.balanceOf(a.id, range);
-    if (a.group === 'Expenses') expense += Store.balanceOf(a.id, range);
+    const f = flows[a.id] || { dr: 0, cr: 0 };
+    if (a.group === 'Income') income += f.cr - f.dr;
+    if (a.group === 'Expenses') expense += f.dr - f.cr;
   }
-  return { income, expense, net: income - expense };
+  return { income, expense, net: income - expense, flows };
 }
 
 function renderPLStatement() {
-  const { income, expense, net } = plFigures(reportRange());
+  const range = reportRange();
+  const { income, expense, net, flows } = plFigures(range);
 
   const sectionRows = (title, list) => {
     const rows = list
       .map((a) => {
-        const bal = Store.balanceOf(a.id, reportRange());
+        const f = flows[a.id] || { dr: 0, cr: 0 };
+        const bal = a.group === 'Income' ? f.cr - f.dr : f.dr - f.cr;
         if (bal === 0) return null;
         return `
           <tr>
@@ -1128,6 +1160,8 @@ function renderBalanceSheet() {
   const assets = panel('Assets', 'Assets');
   const liab = panel('Liabilities', 'Liabilities');
   const liabilitiesTotal = liab.total + net;
+  const offBy = Math.abs(assets.total - liabilitiesTotal);
+  const balanced = offBy < 0.005;
 
   $('#reportBody').innerHTML = `
     <div class="bs-grid">
@@ -1151,7 +1185,8 @@ function renderBalanceSheet() {
           <span class="num" data-total-assets="${assets.total}">${fmt(assets.total)}</span>
         </div>
       </div>
-    </div>`;
+    </div>
+    ${balanced ? '' : `<div class="off-balance">Out of balance by ${fmt(offBy)} — check opening balances.</div>`}`;
 }
 
 function filteredRegister() {

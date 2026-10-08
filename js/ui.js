@@ -18,11 +18,14 @@ function fmt(amount) {
 }
 
 function fmtCompact(amount) {
+  const neg = amount < 0;
   const n = Math.abs(amount);
-  if (n >= 10000000) return `₹${(amount / 10000000).toFixed(2)} Cr`;
-  if (n >= 100000) return `₹${(amount / 100000).toFixed(2)} L`;
-  if (n >= 1000) return `₹${(amount / 1000).toFixed(1)}K`;
-  return `₹${Math.round(amount)}`;
+  let s;
+  if (n >= 10000000) s = `${(n / 10000000).toFixed(2)} Cr`;
+  else if (n >= 100000) s = `${(n / 100000).toFixed(2)} L`;
+  else if (n >= 1000) s = `${(n / 1000).toFixed(1)}K`;
+  else s = `${Math.round(n)}`;
+  return `${neg ? '-' : ''}₹${s}`;
 }
 
 function fmtDate(iso) {

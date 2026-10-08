@@ -120,6 +120,18 @@ function openPeriodModal() {
   setTimeout(() => $('#periodFromInput').focus(), 30);
 }
 
+function ensureSelectOption(select, value) {
+  if (!value) return;
+  const exists = Array.from(select.options).some((o) => o.value === value);
+  if (!exists) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = value;
+    select.appendChild(opt);
+  }
+  select.value = value;
+}
+
 function openAccountModal(id) {
   const form = $('#accountForm');
   const err = $('#accountError');
@@ -131,8 +143,8 @@ function openAccountModal(id) {
     if (!a) return;
     form.id.value = a.id;
     form.name.value = a.name;
-    form.group.value = a.group;
-    form.type.value = a.type;
+    ensureSelectOption(form.group, a.group);
+    ensureSelectOption(form.type, a.type);
     form.opening.value = Number(a.opening) || 0;
     $('#accountModalTitle').textContent = 'Edit Account';
     $('#accountSaveBtn').textContent = 'Update Account';
@@ -222,7 +234,14 @@ function submitEntry() {
 
   let no;
   if (state.editingId) {
-    no = f.no.value.trim() || Store.nextVoucherNo(state.entryType);
+    const typed = f.no.value.trim();
+    if (numberingMode() === 'manual' && !typed) {
+      err.textContent = 'Type a voucher number.';
+      err.hidden = false;
+      f.no.focus();
+      return false;
+    }
+    no = typed || Store.nextVoucherNo(state.entryType);
     if (Store.db.vouchers.some((v) => v.no === no && v.id !== state.editingId)) {
       err.textContent = `Voucher number ${no} already exists.`;
       err.hidden = false;
@@ -439,7 +458,9 @@ function wireEvents() {
       if (state.view !== 'vouchers') return;
       e.preventDefault();
       if (modalOpen) {
-        $('#accountForm').requestSubmit();
+        const overlay = $$('.modal-overlay').find((o) => !o.hidden);
+        const form = overlay && overlay.querySelector('form');
+        if (form) form.requestSubmit();
         return;
       }
       submitEntry();
@@ -774,7 +795,7 @@ function wireEvents() {
     const vch = e.target.closest('[data-result-voucher]');
     if (vch) {
       hideGlobalResults();
-      showView('register');
+      startEditVoucher(vch.dataset.resultVoucher);
     }
   });
 
