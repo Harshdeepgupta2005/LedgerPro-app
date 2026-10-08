@@ -2,7 +2,7 @@
 
 All notable changes to LedgerPro are documented here. Semantic versioning.
 
-## [Unreleased]
+## [1.5.0] - 2026-10-08
 
 ### Fixed
 - Cleared books no longer resurrect sample data on restart (`initialized` flag)
@@ -28,9 +28,10 @@ All notable changes to LedgerPro are documented here. Semantic versioning.
 ### Security
 - CSP tightened: `base-uri`, `form-action`, `object-src` restricted
 - Attribute context escaping (`attr`) applied to every interpolated attribute
-- `setWindowOpenHandler` denies new windows; `will-navigate` blocks navigations
-- `sandbox: true` for renderer web preferences
+- Window open/navigation guarded ("navigate to any URL" disabled), renderer
+  sandbox enabled
 - CSV export adds a UTF-8 BOM and neutralizes spreadsheet formula injection
+- About/sidebar report the real storage backend (`SQLite` vs `localStorage`)
 - Native module startup check validates the ABI, not just file existence
 - Smoke-mode require is disabled in packaged builds
 
@@ -47,6 +48,15 @@ All notable changes to LedgerPro are documented here. Semantic versioning.
 - `release.sh` now verifies first, rolls back on failure, detects architecture,
   verifies the DMG payload version, keeps the 3 newest DMGs, and no longer
   strips quarantine from unsigned builds
+- Native ABI check (`npm run check:native`) runs inside Electron, matching the
+  ABI the app is built for
+
+### Accessibility
+- Visible labels / `aria-label`s for search, amount, opening balance, and
+  icon-only buttons
+- `role="alert"` on form errors; live region for toasts
+- `scope="col"` on tables; `aria-hidden` on decorative icons
+- Focus trap and focus restore in modals
 
 ## [1.4.0]
 
