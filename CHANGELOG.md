@@ -25,6 +25,9 @@ All notable changes to LedgerPro are documented here. Semantic versioning.
 
 - Restore could silently leave the books closed after `VACUUM INTO` when the
   internal Database instance shadowed the module close/attach helpers
+- Export CI re-verification counted CSV success toasts with a single end-of-run
+  DOM snapshot (flaky because toasts auto-dismiss); it now awaits each ledger's
+  CSV toast in turn and validates the written files directly
 - Re-verification: backup/restore round-trip, dashboard cards, voucher focus
   and Esc back-stack are now covered by the automated harnesses (checks 45 → 52)
 

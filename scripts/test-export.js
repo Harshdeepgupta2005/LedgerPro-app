@@ -120,11 +120,18 @@ app.whenReady().then(async () => {
   }
 
   const result = await evalIn(`(async () => {
-    const out = { error: null, csvToasts: 0, pdfToastSeen: false, hitOk: true, pdfHitOk: true, printPopulated: true };
+    const out = { error: null, csvToastsSeen: 0, pdfToastSeen: false, hitOk: true, pdfHitOk: true, printPopulated: true };
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const accounts = Store.db.accounts;
     const toastTexts = () =>
       Array.from(document.querySelectorAll('#toastStack .toast')).map((t) => t.textContent);
+    const waitToast = async (frag, tries = 25) => {
+      for (let i = 0; i < tries; i++) {
+        if (toastTexts().some((t) => t.includes(frag))) return true;
+        await wait(100);
+      }
+      return false;
+    };
     try {
       for (const a of accounts) {
         openLedger(a.id);
@@ -136,10 +143,10 @@ app.whenReady().then(async () => {
         );
         if (!(over === el || el.contains(over))) out.hitOk = false;
         el.click();
+        if (await waitToast('CSV')) out.csvToastsSeen++;
         await wait(90);
         if (document.getElementById('ledgerOverlay').hidden) throw new Error('drawer closed during export ' + a.id);
       }
-      out.csvToasts = toastTexts().filter((t) => t.includes('CSV')).length;
       out.errorToast = toastTexts().find((t) => t.includes('available in the desktop app')) || null;
 
       for (const a of accounts) {
@@ -168,15 +175,15 @@ app.whenReady().then(async () => {
   if (result.hitOk === false) failures.push('a CSV button was not clickable by pointer');
   if (result.pdfHitOk === false) failures.push('the PDF button was not clickable by pointer');
   if (result.printPopulated === false) failures.push('print container was empty during a PDF export');
-  if (result.csvToasts !== accounts.length)
-    failures.push('expected ' + accounts.length + ' CSV toasts, got ' + result.csvToasts);
+  if (result.csvToastsSeen !== accounts.length)
+    failures.push('expected a CSV success toast for every ledger, observed ' + result.csvToastsSeen);
   if (!result.pdfToastSeen) failures.push('no PDF success toast observed during export');
   if (result.errorToast) failures.push('unexpected fallback toast: ' + result.errorToast);
   console.log(
     'EXPORT_DBG result=' +
       JSON.stringify({
         accounts: result.accounts,
-        csvToasts: result.csvToasts,
+        csvToastsSeen: result.csvToastsSeen,
         pdfToastSeen: result.pdfToastSeen,
         hitOk: result.hitOk,
         pdfHitOk: result.pdfHitOk,
