@@ -7,8 +7,9 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "prestart": "node scripts/check-native.js",
-    "predev": "node scripts/check-native.js",
+    "prestart": "npm run check:native",
+    "predev": "npm run check:native",
+    "check:native": "electron scripts/check-native.js",
     "dist": "electron-builder --mac",
     "smoke": "LEDGERPRO_SMOKE=1 electron .",
     "lint": "eslint db.js preload.js main.js js/*.js scripts/*.js",

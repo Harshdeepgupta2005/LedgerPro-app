@@ -23,6 +23,7 @@ on your machine.
 ```bash
 npm install
 npm start         # dev run (guards native module via prestart)
+npm run check:native   # verifies the native module inside Electron's ABI
 npm test          # unit tests (node --test)
 npm run test:persistence   # SQLite round-trip persistence test (Electron main)
 npm run smoke     # full release smoke test (boots the real app, temp profile)

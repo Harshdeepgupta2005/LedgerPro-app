@@ -42,7 +42,7 @@ echo "==> Releasing LedgerPro v$OLD_VERSION -> v$VERSION"
 echo "==> Pre-verification (current tree)"
 npm run lint
 npm test
-node scripts/check-native.js
+npm run check:native
 npm run test:persistence
 npm run smoke
 
