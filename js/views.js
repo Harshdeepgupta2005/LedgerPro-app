@@ -450,7 +450,7 @@ function renderSideSuggestions(side) {
   el.innerHTML = matches
     .map(
       (a, i) => `
-      <div class="suggest-item${i === 0 ? ' active' : ''}" data-suggest-id="${a.id}">
+      <div class="suggest-item${i === 0 ? ' active' : ''}" data-suggest-id="${attr(a.id)}">
         <span class="s-name">${esc(a.name)}</span>
         <span class="s-sub">${badge(a.group)} · <span class="s-bal">${fmt(Store.balanceOf(a.id))}</span></span>
       </div>`
@@ -534,7 +534,7 @@ function renderGlobalResults() {
       accounts
         .map(
           (a) => `
-        <div class="result-row" data-result-account="${a.id}" tabindex="0">
+        <div class="result-row" data-result-account="${attr(a.id)}" tabindex="0">
           <span class="result-title">${esc(a.name)}</span>
           <span class="result-sub">${esc(a.group)} · ${esc(a.type)}</span>
         </div>`
@@ -546,7 +546,7 @@ function renderGlobalResults() {
       vouchers
         .map(
           (v) => `
-        <div class="result-row" data-result-voucher="${v.id}" tabindex="0">
+        <div class="result-row" data-result-voucher="${attr(v.id)}" tabindex="0">
           <span class="result-title">${esc(v.no)} · ${badge(v.type)}</span>
           <span class="result-sub">${esc(Store.accountName(v.dr))} → ${esc(Store.accountName(v.cr))} · ${fmt(v.amount)}</span>
         </div>`
@@ -765,7 +765,7 @@ function renderAccounts() {
       const bal = Store.balanceOf(a.id);
       const debitNormal = isDebitNormal(a);
       return `
-      <tr data-ledger="${a.id}" title="Open ledger">
+      <tr data-ledger="${attr(a.id)}" title="Open ledger">
         <td><span class="cell-title">${esc(a.name)}</span><span class="cell-sub">Open ledger →</span></td>
         <td>${badge(a.group)}</td>
         <td>${badge(a.type)}</td>
@@ -773,10 +773,10 @@ function renderAccounts() {
           <span class="cell-sub">${debitNormal ? 'Debit' : 'Credit'} balance</span></td>
         <td>
           <div class="row-actions">
-            <button class="icon-btn edit" data-edit-account="${a.id}" title="Edit account">
+            <button class="icon-btn edit" data-edit-account="${attr(a.id)}" title="Edit account">
               <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
             </button>
-            <button class="icon-btn danger" data-delete-account="${a.id}" title="Delete">${ICONS.trash}</button>
+            <button class="icon-btn danger" data-delete-account="${attr(a.id)}" title="Delete">${ICONS.trash}</button>
           </div>
         </td>
       </tr>`;
@@ -818,7 +818,7 @@ function renderLedger() {
   const data = ledgerRowsData(a);
   const rows = data.map(
     ({ v, isDebit, other, bal }) => `
-      <tr data-row-voucher="${v.id}">
+      <tr data-row-voucher="${attr(v.id)}">
         <td>${fmtDate(v.date)}</td>
         <td class="mono">${esc(v.no)}</td>
         <td><span class="cell-title">${esc(other)}</span><span class="cell-sub">${esc(v.narration || '—')}</span></td>
@@ -827,10 +827,10 @@ function renderLedger() {
         <td class="num"><strong class="${bal < 0 ? 'text-red' : ''}">${fmt(bal)}</strong></td>
         <td>
           <div class="row-actions">
-            <button class="icon-btn edit" data-edit-voucher="${v.id}" title="Edit entry">
+            <button class="icon-btn edit" data-edit-voucher="${attr(v.id)}" title="Edit entry">
               <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
             </button>
-            <button class="icon-btn danger" data-delete-voucher="${v.id}" title="Delete entry">${ICONS.trash}</button>
+            <button class="icon-btn danger" data-delete-voucher="${attr(v.id)}" title="Delete entry">${ICONS.trash}</button>
           </div>
         </td>
       </tr>`
@@ -868,7 +868,12 @@ function exportFileBase(a) {
 }
 
 function ledgerCSV(a) {
-  const cell = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+  const cell = (s) => {
+    let str = String(s ?? '');
+    const isNumeric = str.trim() !== '' && String(parseFloat(str)) === str;
+    if (!isNumeric && /^[=+\-@]/.test(str.trim())) str = "'" + str;
+    return `"${str.replace(/"/g, '""')}"`;
+  };
   const round = (n) => Math.round(n * 100) / 100;
   const data = ledgerRowsData(a);
   const opening = Number(a.opening) || 0;
@@ -944,7 +949,7 @@ function exportLedgerCSV() {
     .saveFile({
       defaultName: `${exportFileBase(a)}-ledger.csv`,
       filters: [{ name: 'CSV', extensions: ['csv'] }],
-      content: ledgerCSV(a),
+      content: '\uFEFF' + ledgerCSV(a),
     })
     .then((res) => {
       if (res && res.ok) toast('Ledger exported as CSV');
@@ -1218,7 +1223,7 @@ function renderRegister() {
   tbody.innerHTML = rows
     .map(
       (v) => `
-      <tr data-row-voucher="${v.id}">
+      <tr data-row-voucher="${attr(v.id)}">
         <td class="mono">${esc(v.no)}</td>
         <td>
           <span class="cell-title">${fmtDate(v.date)}</span>
@@ -1232,10 +1237,10 @@ function renderRegister() {
         <td class="num"><strong>${fmt(v.amount)}</strong></td>
         <td>
           <div class="row-actions">
-            <button class="icon-btn edit" data-edit-voucher="${v.id}" title="Edit entry">
+            <button class="icon-btn edit" data-edit-voucher="${attr(v.id)}" title="Edit entry">
               <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
             </button>
-            <button class="icon-btn danger" data-delete-voucher="${v.id}" title="Delete">${ICONS.trash}</button>
+            <button class="icon-btn danger" data-delete-voucher="${attr(v.id)}" title="Delete">${ICONS.trash}</button>
           </div>
         </td>
       </tr>`
@@ -1267,7 +1272,12 @@ function renderSettings() {
     ['Chromium', versions.chrome || 'n/a'],
     ['Node.js', versions.node || 'n/a'],
     ['Platform', info.platform || navigator.platform],
-    ['Storage', info.storage || 'Browser localStorage (UI preview)'],
+    [
+      'Storage',
+      Store.backend === 'sqlite'
+        ? 'SQLite database (ledger.db)'
+        : 'Browser localStorage (SQLite unavailable)',
+    ],
   ]
     .map(([k, v]) => `<div class="about-row"><span>${k}</span><span>${esc(v)}</span></div>`)
     .join('');

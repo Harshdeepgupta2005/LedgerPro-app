@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('./db');
 
-if (process.env.LEDGERPRO_SMOKE) require('./scripts/smoke');
+if (process.env.LEDGERPRO_SMOKE && !app.isPackaged) require('./scripts/smoke');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -19,10 +19,15 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
 
   win.loadFile('index.html');
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', (event, url) => {
+    if (url !== win.webContents.getURL()) event.preventDefault();
+  });
   win.once('ready-to-show', () => win.show());
 }
 
@@ -44,6 +49,10 @@ ipcMain.on('db:save', (event, doc) => {
 
 ipcMain.on('app:version', (event) => {
   event.returnValue = app.getVersion();
+});
+
+ipcMain.on('db:mode', (event) => {
+  event.returnValue = db.dbMode();
 });
 
 app.whenReady().then(() => {

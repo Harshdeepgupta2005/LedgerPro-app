@@ -1,8 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('ledger', {
-  platform: process.platform,
-  storage: 'SQLite database (ledger.db)',
+  platform: process.platform || '',
+  hasSqlite: Boolean(ipcRenderer.sendSync('db:mode')),
   appVersion: ipcRenderer.sendSync('app:version'),
   versions: {
     app: process.versions.electron,

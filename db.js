@@ -213,4 +213,4 @@ function close() {
   db = null;
 }
 
-module.exports = { open, load, save, close };
+module.exports = { open, load, save, close, dbMode: () => Boolean(db) };

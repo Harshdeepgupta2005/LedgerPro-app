@@ -856,6 +856,11 @@ function init() {
     const v = window.ledger && window.ledger.appVersion;
     versionLabel.textContent = v ? `v${v}` : 'dev';
   }
+  const storageLabel = document.getElementById('appStorageLabel');
+  if (storageLabel) {
+    storageLabel.textContent =
+      window.ledger && window.ledger.hasSqlite === false ? 'LocalStorage mode' : 'Local SQLite';
+  }
   Store.load();
   state.bookDate = Prefs.bookDate() || todayISO();
   state.period = Prefs.period();

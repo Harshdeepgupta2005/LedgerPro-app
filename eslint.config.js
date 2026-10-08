@@ -21,6 +21,7 @@ const browserGlobals = {
   fmtTime: 'readonly',
   todayISO: 'readonly',
   esc: 'readonly',
+  attr: 'readonly',
   ICONS: 'readonly',
   badge: 'readonly',
   toast: 'readonly',

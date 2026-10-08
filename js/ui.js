@@ -54,6 +54,15 @@ function esc(str) {
     .replace(/"/g, '&quot;');
 }
 
+function attr(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 const ICONS = {
   wallet:
     '<svg viewBox="0 0 24 24"><path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1"/><path d="M16 14h.01"/></svg>',
@@ -70,7 +79,7 @@ const ICONS = {
 };
 
 function badge(text) {
-  return `<span class="badge badge-${text.toLowerCase()}">${esc(text)}</span>`;
+  return `<span class="badge badge-${attr(text).toLowerCase()}">${esc(text)}</span>`;
 }
 
 function toast(message, type = 'success') {
