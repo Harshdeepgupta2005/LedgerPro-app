@@ -2,6 +2,32 @@
 
 All notable changes to LedgerPro are documented here. Semantic versioning.
 
+## [1.5.3] - 2026-10-08
+
+### Added
+
+- Settings → Data card now offers Backup and Restore backup data buttons.
+  Backup writes a portable SQLite copy (`LedgerPro-backup-<date>.db`) via
+  `VACUUM INTO`; Restore validates the chosen file before replacing the active
+  books (auto-backup first) and reloads the app
+- Backups are written on every successful DB write (kept in userData `backups/`)
+
+### Changed
+
+- Voucher screen no longer auto-focuses the first ledger on open; pressing
+  Enter focuses it (avoids the entry field grabbing focus on every visit)
+- Dashboard stat cards are now computed on the same net basis as the P&L
+  (per-account Income cr−dr / Expenses dr−cr) so Income, Expense, Net and
+  Liquid cards always tie to the reports; cards carry data attributes for testing
+- The Sample data/Reset and Clear books buttons were removed from Settings
+
+### Fixed
+
+- Restore could silently leave the books closed after `VACUUM INTO` when the
+  internal Database instance shadowed the module close/attach helpers
+- Re-verification: backup/restore round-trip, dashboard cards, voucher focus
+  and Esc back-stack are now covered by the automated harnesses (checks 45 → 52)
+
 ## [1.5.2] - 2026-10-08
 
 ### Fixed

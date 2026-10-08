@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('ledger', {
   },
   saveFile: (options) => ipcRenderer.invoke('export:save', options),
   printPDF: (options) => ipcRenderer.invoke('export:pdf', options),
+  backupData: () => ipcRenderer.invoke('data:backup'),
+  restoreData: () => ipcRenderer.invoke('data:restore'),
   dbLoad: () => ipcRenderer.sendSync('db:load'),
   dbSave: (doc) => ipcRenderer.invoke('db:save', doc),
 });

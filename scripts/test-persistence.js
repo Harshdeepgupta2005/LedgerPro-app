@@ -111,6 +111,70 @@ app.whenReady().then(async () => {
   check('cleared DB stays initialized', cleared.initialized === true);
   db.close();
 
+  // --- Backup/restore round-trip (VACUUM INTO + replace active file) ---
+  db.open();
+  db.save({
+    accounts: [
+      { id: 'acc1', name: 'Cash', group: 'Assets', type: 'Cash', opening: 500 },
+      { id: 'acc2', name: 'Sales', group: 'Income', type: 'Other', opening: 0 },
+    ],
+    vouchers: [
+      {
+        id: 'v1',
+        no: 'RCP-0001',
+        date: '2026-01-02',
+        type: 'Receipt',
+        dr: 'acc1',
+        cr: 'acc2',
+        amount: 900,
+        narration: 'Sale',
+        createdAt: '2026-01-02T10:11:12.345Z',
+      },
+    ],
+    seqs: { voucher: 9, account: 5 },
+  });
+  const backupPath = path.join(TMP, 'backup-out.db');
+  const bk = db.exportBackup(backupPath);
+  check('backup export ok', bk.ok === true && fs.existsSync(backupPath));
+
+  // Corrupt candidate is rejected before anything changes
+  const junk = path.join(TMP, 'junk.db');
+  fs.writeFileSync(junk, 'this is not a database');
+  check('restore rejects non-db', db.restoreFrom(junk).ok === false);
+  check('active data intact after bad restore', db.load().vouchers.length === 1);
+  db.close();
+  await sleep(1100);
+
+  // Overwrite the active books with the backup, then confirm it reloads fine
+  const dbPath = path.join(TMP, 'ledger.db');
+  fs.copyFileSync(backupPath, dbPath);
+  [dbPath + '-wal', dbPath + '-shm'].forEach((p) => {
+    try {
+      fs.unlinkSync(p);
+    } catch (e) {
+      /* ignore */
+    }
+  });
+
+  // Simulate a restore: validate + copy is already done via exportBackup target == source of truth.
+  // Directly exercise validateDbFile path through restoreFrom on the copy.
+  db.open();
+  const restored = db.restoreFrom(backupPath);
+  check('restore of valid backup ok', restored.ok === true);
+  check('restored seqs', db.load().seqs.voucher === 9 && db.load().seqs.account === 5);
+  db.close();
+  await sleep(1100);
+
+  db.open();
+  const afterRestore = db.load();
+  check(
+    'restored books survive reopen',
+    afterRestore.accounts.length === 2 &&
+      afterRestore.vouchers.length === 1 &&
+      afterRestore.vouchers[0].no === 'RCP-0001'
+  );
+  db.close();
+
   try {
     fs.rmSync(TMP, { recursive: true, force: true });
   } catch (e) {

@@ -234,8 +234,45 @@ app.whenReady().then(async () => {
     collect('period.trial.dr', parseFloat(readData('dr')), pdr);
     collect('period.trial.cr', parseFloat(readData('cr')), pcr);
 
+    // ---- Dashboard cards (must be independent of region/backing) ----
+    const readCard = (k) =>
+      parseFloat(document.querySelector('[data-card-' + k + ']').getAttribute('data-card-' + k));
+
+    let liquid = 0;
+    for (const a of accounts) if (a.type === 'Cash' || a.type === 'Bank') liquid += bal(a, null);
+
+    showView('dashboard', { record: false });
+    collect('dash.period.income', readCard('income'), pinc);
+    collect('dash.period.expense', readCard('expense'), pexp);
+    collect('dash.period.net', readCard('net'), pnet);
+    collect('dash.liquid', readCard('liquid'), liquid);
+    out.ui.dashPeriod = {
+      income: readCard('income'),
+      expense: readCard('expense'),
+      net: readCard('net'),
+      liquid: readCard('liquid'),
+    };
+
+    // No period → cards show the current month (net basis)
     state.period = null;
-    renderCurrent();
+    showView('dashboard', { record: false });
+    const mkey = String(new Date().getFullYear()) + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+    let mi = 0, me = 0;
+    for (const a of accounts) {
+      let adr = 0, acr = 0;
+      for (const x of vouchers) {
+        if (String(x.date).slice(0, 7) !== mkey) continue;
+        if (x.dr === a.id) adr += x.amount;
+        if (x.cr === a.id) acr += x.amount;
+      }
+      if (a.group === 'Income') mi += acr - adr;
+      else if (a.group === 'Expenses') me += adr - acr;
+    }
+    collect('dash.month.income', readCard('income'), mi);
+    collect('dash.month.expense', readCard('expense'), me);
+    collect('dash.month.net', readCard('net'), mi - me);
+    out.ui.dashMonth = { income: readCard('income'), expense: readCard('expense'), net: readCard('net') };
+    out.dashMonth = { income: mi, expense: me };
 
     const bad = out.checks.filter((c) => !c.ok);
     out.failures = bad.map((c) => c.label + ' got=' + c.got + ' want=' + c.want);
@@ -274,6 +311,27 @@ app.whenReady().then(async () => {
     failures.push('esc nav unexpected: ' + JSON.stringify(escCheck));
   }
 
+  const voucherCheck = await evalIn(`(async () => {
+    const dr = document.getElementById('entryForm').dr;
+    showView('dashboard', { record: false });
+    showView('vouchers');
+    await new Promise((r) => setTimeout(r, 160));
+    const autoFocused = document.activeElement === dr;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const enterFocused = document.activeElement === dr;
+    showView('dashboard', { record: false });
+    return { autoFocused, enterFocused };
+  })()`);
+
+  if (voucherCheck) {
+    if (voucherCheck.autoFocused)
+      failures.push('voucher 1st ledger autofocuses on open (should wait for Enter)');
+    if (!voucherCheck.enterFocused) failures.push('Enter did not focus the 1st ledger on the voucher screen');
+    console.log('REPORTS_DBG focus=' + JSON.stringify(voucherCheck));
+  } else {
+    failures.push('voucher focus check returned nothing');
+  }
+
   const report = result || {};
   if (report.failures && report.failures.length)
     failures.push('report mismatch: ' + report.failures.join(' | '));
@@ -286,6 +344,7 @@ app.whenReady().then(async () => {
         u: report.ui,
         i: report.totals,
         period: report.period,
+        dashMonth: report.dashMonth,
         accounts: report.accounts,
         vouchers: report.vouchers,
       })
@@ -304,6 +363,8 @@ app.whenReady().then(async () => {
       report.totals.assets +
       '/' +
       report.totals.capital +
+      ' dashMonth=' +
+      JSON.stringify(report.dashMonth) +
       ' checks=' +
       report.checks.length
   );

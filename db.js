@@ -8,6 +8,7 @@ const BACKUP_KEEP = 5;
 
 let db = null;
 let backupDir = null;
+let dbPath = null;
 
 let lastStamp = '';
 let backupSeq = 0;
@@ -95,7 +96,8 @@ function open() {
   const dir = app.getPath('userData');
   fs.mkdirSync(dir, { recursive: true });
   backupDir = path.join(dir, 'backups');
-  db = new Database(path.join(dir, 'ledger.db'));
+  dbPath = path.join(dir, 'ledger.db');
+  db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');
   db.exec(`
@@ -254,4 +256,63 @@ function close() {
   db = null;
 }
 
-module.exports = { open, load, save, close, dbMode: () => Boolean(db) };
+function exportBackup(target) {
+  if (!db) throw new Error('Database not open');
+  db.prepare('VACUUM INTO ?').run(String(target));
+  return { ok: true, path: String(target) };
+}
+
+function validateDbFile(file) {
+  const d = new Database(String(file), { readonly: true });
+  try {
+    const tables = d
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all()
+      .map((r) => r.name);
+    if (!tables.includes('accounts') || !tables.includes('vouchers')) {
+      return { ok: false, error: 'Not a LedgerPro database (accounts/vouchers tables missing)' };
+    }
+    const accCols = d
+      .prepare('PRAGMA table_info(accounts)')
+      .all()
+      .map((c) => c.name);
+    const vchCols = d
+      .prepare('PRAGMA table_info(vouchers)')
+      .all()
+      .map((c) => c.name);
+    const missing = (cols, need) => need.filter((c) => !cols.includes(c));
+    const badAcc = missing(accCols, ['id', 'name', 'group_name', 'type', 'opening']);
+    const badVch = missing(vchCols, ['id', 'no', 'date', 'type', 'dr', 'cr', 'amount']);
+    if (badAcc.length || badVch.length)
+      return { ok: false, error: 'Not a LedgerPro database (schema mismatch)' };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: 'Not a readable SQLite database' };
+  } finally {
+    d.close();
+  }
+}
+
+function restoreFrom(source) {
+  const check = validateDbFile(source);
+  if (!check.ok) return check;
+  if (!db || !dbPath) return { ok: false, error: 'Database not open' };
+  try {
+    makeBackup();
+    close();
+    fs.copyFileSync(String(source), dbPath);
+    for (const ext of ['-wal', '-shm']) {
+      try {
+        fs.unlinkSync(dbPath + ext);
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    open();
+    return { ok: true, path: String(source) };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+}
+
+module.exports = { open, load, save, close, exportBackup, restoreFrom, dbMode: () => Boolean(db) };

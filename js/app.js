@@ -18,8 +18,6 @@ function goBackView() {
   showView(target, { record: false });
 }
 
-let entryFocusTimer = null;
-
 function applyTheme(choice) {
   const resolved =
     choice === 'system'
@@ -77,13 +75,6 @@ function showView(name, { record = true } = {}) {
 
   renderCurrent();
   renderGlobalResults();
-
-  if (name === 'vouchers') {
-    clearTimeout(entryFocusTimer);
-    entryFocusTimer = setTimeout(() => {
-      if (state.view === 'vouchers' && !state.editingId) focusFirstLedger();
-    }, 70);
-  }
 }
 
 function entryChain() {
@@ -481,6 +472,14 @@ function wireEvents() {
         }
       }
 
+      if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (state.view === 'vouchers' && !state.editingId) {
+          e.preventDefault();
+          focusFirstLedger();
+          return;
+        }
+      }
+
       if (e.key && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
         if (!$('#ledgerOverlay').hidden) return;
         const view = NAV_KEYS[e.key.toLowerCase()];
@@ -813,24 +812,32 @@ function wireEvents() {
     toast(`${count} voucher numbers rearranged`);
   });
 
-  $('#resetDataBtn').addEventListener('click', () => {
-    if (!confirm('Replace current books with sample data?')) return;
-    closeLedger();
-    Store.reset();
-    syncLedgerFields({ preserve: true });
-    resetEntryForm();
-    renderCurrent();
-    toast('Sample data restored');
+  $('#backupDataBtn').addEventListener('click', async () => {
+    if (!window.ledger || !window.ledger.backupData) {
+      toast('Backup is available in the desktop app', 'error');
+      return;
+    }
+    const res = await window.ledger.backupData();
+    if (res && res.ok) toast('Backup saved to ' + (res.path || 'file'), 'success');
+    else if (res && res.error) toast('Backup failed: ' + res.error, 'error');
   });
 
-  $('#clearDataBtn').addEventListener('click', () => {
-    if (!confirm('Delete all accounts and vouchers? This cannot be undone.')) return;
-    closeLedger();
-    Store.clear();
-    syncLedgerFields({ preserve: true });
-    resetEntryForm();
-    renderCurrent();
-    toast('Books cleared');
+  $('#restoreDataBtn').addEventListener('click', async () => {
+    if (!window.ledger || !window.ledger.restoreData) {
+      toast('Restore is available in the desktop app', 'error');
+      return;
+    }
+    if (!confirm('Restore from a backup file? Current books will be replaced after a safety copy is kept.')) {
+      return;
+    }
+    await Store.flushNow();
+    const res = await window.ledger.restoreData();
+    if (res && res.ok) {
+      toast('Backup restored — reloading');
+      setTimeout(() => window.location.reload(), 700);
+    } else if (res && res.error) {
+      toast('Restore failed: ' + res.error, 'error');
+    }
   });
 }
 

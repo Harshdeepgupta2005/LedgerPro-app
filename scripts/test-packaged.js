@@ -128,28 +128,94 @@ async function main() {
     openLedger(Store.db.accounts[0].id);
     await new Promise((r) => setTimeout(r, 600));
     const ov = document.getElementById('ledgerOverlay');
-    const btn = document.getElementById('ledgerExportCSV');
-    return { drawer: ov && !ov.hidden, btn: !!btn, rect: btn && btn.getBoundingClientRect().toJSON() };
+    const csv = document.getElementById('ledgerExportCSV');
+    const pdf = document.getElementById('ledgerExportPDF');
+    return {
+      drawer: ov && !ov.hidden,
+      csv: !!csv,
+      pdf: !!pdf,
+      csvRect: csv && csv.getBoundingClientRect().toJSON(),
+      pdfRect: pdf && pdf.getBoundingClientRect().toJSON(),
+    };
   })()`);
   console.log('PACKAGED_DRAWER ' + JSON.stringify(opened));
 
-  const pending = await evalJS(`(async () => {
-    const r = await Promise.race([
-      window.ledger.saveFile({ defaultName: 'zz-dialog-probe.csv', filters: [{ name: 'CSV', extensions: ['csv'] }], content: 'probe' }),
-      new Promise((res) => setTimeout(() => res('__PENDING__'), 1500)),
-    ]);
-    return typeof r === 'string' ? r : JSON.stringify(r);
-  })()`);
-  console.log('PACKAGED_DIALOG_PROBE ' + pending);
+  const esc = (label) => {
+    try {
+      execSync('osascript -e \'tell application "System Events" to key code 53\' 2>/dev/null', {
+        stdio: 'ignore',
+      });
+    } catch (e) {
+      console.log('PACKAGED_ESCERR ' + label + ' ' + String(e));
+    }
+  };
 
-  try {
-    execSync('osascript -e \'tell application "System Events" to key code 53\' 2>/dev/null', {
-      stdio: 'ignore',
-    });
-  } catch (e) {
-    console.log('PACKAGED_ESCERR ' + String(e));
+  const shot = (name) => {
+    try {
+      execSync('screencapture -x /tmp/ledgerpro-' + name + '.png 2>/dev/null', { stdio: 'ignore' });
+      return fs.existsSync('/tmp/ledgerpro-' + name + '.png');
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const winList = (tag) => {
+    try {
+      const out = execSync(
+        'osascript -e \'tell application "System Events" to tell process "LedgerPro" to get name of every window\' 2>/dev/null',
+        { encoding: 'utf8', maxBuffer: 1e6, stdio: ['ignore', 'pipe', 'pipe'] }
+      ).trim();
+      console.log('PACKAGED_WINDOWS_' + tag + ' ' + JSON.stringify(out));
+    } catch (e) {
+      console.log('PACKAGED_WINDOWS_' + tag + ' denied');
+    }
+  };
+
+  const clickAndInspect = async (id, tag) => {
+    const clicked = await evalJS(`(async () => {
+      const b = document.getElementById('${id}');
+      if (!b) return 'no button';
+      b.click();
+      return 'clicked';
+    })()`);
+    console.log('PACKAGED_CLICK ' + tag + ' ' + clicked);
+    await sleep(900);
+    const st = await evalJS(
+      "Array.from(document.querySelectorAll('#toastStack .toast')).map(t=>t.textContent)"
+    );
+    console.log('PACKAGED_TOASTS_' + tag + '_BEFORE_CANCEL ' + JSON.stringify(st));
+    console.log('PACKAGED_SHOT ' + tag + ' ' + (shot(tag) ? 'saved' : 'skipped'));
+    winList(tag);
+    esc(tag);
+    await sleep(700);
+    const en = await evalJS(
+      "Array.from(document.querySelectorAll('#toastStack .toast')).map(t=>t.textContent)"
+    );
+    console.log('PACKAGED_TOASTS_' + tag + '_AFTER_CANCEL ' + JSON.stringify(en));
+    return { before: st, after: en };
+  };
+
+  const csvObs = await clickAndInspect('ledgerExportCSV', 'csv');
+  const pdfObs = await clickAndInspect('ledgerExportPDF', 'pdf');
+
+  for (const [tag, obs] of [
+    ['csv', csvObs],
+    ['pdf', pdfObs],
+  ]) {
+    if (!Array.isArray(obs.before)) throw new Error(tag + ' before-cancel toast scan failed');
+    const pdf = obs.before.some((t) => /pdf/i.test(t));
+    const err = obs.before.some((t) => /failed|could not/i.test(t));
+    if (tag === 'csv' && (pdf || err))
+      throw new Error('csv export surfaced unexpected toast pre-cancel: ' + JSON.stringify(obs.before));
+    if (tag === 'pdf' && err)
+      throw new Error('pdf export surfaced an error toast pre-cancel: ' + JSON.stringify(obs.before));
   }
-  await sleep(500);
+  console.log(
+    'PACKAGED_DIALOG_OK csvToastsPreCancel=' +
+      JSON.stringify(csvObs.before) +
+      ' pdfToastsPreCancel=' +
+      JSON.stringify(pdfObs.before)
+  );
 
   child.kill();
   console.log('PACKAGED_DONE');

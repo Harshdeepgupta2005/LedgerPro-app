@@ -107,17 +107,22 @@ function activateRowNav(row) {
 }
 
 function monthlyFigures() {
+  const inCardPeriod = (v) => {
+    if (state.period) return inPeriod(v);
+    return monthKey(v.date) === thisMonthKey();
+  };
   let income = 0;
   let expense = 0;
-  const scope = state.period || {};
-  for (const v of Store.db.vouchers) {
-    if (scope.from && v.date < scope.from) continue;
-    if (scope.to && v.date > scope.to) continue;
-    if (!state.period && monthKey(v.date) !== thisMonthKey()) continue;
-    const dr = Store.account(v.dr);
-    const cr = Store.account(v.cr);
-    if (cr && cr.group === 'Income') income += v.amount;
-    if (dr && dr.group === 'Expenses') expense += v.amount;
+  for (const a of Store.db.accounts) {
+    let dr = 0;
+    let cr = 0;
+    for (const v of Store.db.vouchers) {
+      if (!inCardPeriod(v)) continue;
+      if (v.dr === a.id) dr += v.amount;
+      if (v.cr === a.id) cr += v.amount;
+    }
+    if (a.group === 'Income') income += cr - dr;
+    else if (a.group === 'Expenses') expense += dr - cr;
   }
   return { income, expense };
 }
@@ -137,7 +142,7 @@ function renderDashboard() {
         <span class="stat-label">Cash &amp; Bank</span>
         <span class="stat-icon tint-blue">${ICONS.wallet}</span>
       </div>
-      <div class="stat-value">${fmtCompact(liquid)}</div>
+      <div class="stat-value" data-card-liquid="${liquid}">${fmtCompact(liquid)}</div>
       <div class="stat-sub">Across all cash &amp; bank accounts</div>
     </div>
     <div class="stat">
@@ -145,7 +150,7 @@ function renderDashboard() {
         <span class="stat-label">Income</span>
         <span class="stat-icon tint-green">${ICONS.arrowDown}</span>
       </div>
-      <div class="stat-value text-green">${fmtCompact(income)}</div>
+      <div class="stat-value text-green" data-card-income="${income}">${fmtCompact(income)}</div>
       <div class="stat-sub">${statsSub}</div>
     </div>
     <div class="stat">
@@ -153,7 +158,7 @@ function renderDashboard() {
         <span class="stat-label">Expenses</span>
         <span class="stat-icon tint-red">${ICONS.arrowUp}</span>
       </div>
-      <div class="stat-value text-red">${fmtCompact(expense)}</div>
+      <div class="stat-value text-red" data-card-expense="${expense}">${fmtCompact(expense)}</div>
       <div class="stat-sub">${statsSub}</div>
     </div>
     <div class="stat">
@@ -161,7 +166,7 @@ function renderDashboard() {
         <span class="stat-label">Net Profit</span>
         <span class="stat-icon tint-indigo">${ICONS.chart}</span>
       </div>
-      <div class="stat-value ${income - expense >= 0 ? 'text-green' : 'text-red'}">${fmtCompact(income - expense)}</div>
+      <div class="stat-value ${income - expense >= 0 ? 'text-green' : 'text-red'}" data-card-net="${income - expense}">${fmtCompact(income - expense)}</div>
       <div class="stat-sub">${statsSub}</div>
     </div>`;
 

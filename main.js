@@ -112,6 +112,42 @@ ipcMain.handle('export:pdf', (event, { defaultName }) =>
   })
 );
 
+function backStamp() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
+
+ipcMain.handle('data:backup', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    title: 'Backup LedgerPro data',
+    defaultPath: `LedgerPro-backup-${backStamp()}.db`,
+    filters: [{ name: 'LedgerPro backup', extensions: ['db'] }],
+  });
+  if (canceled || !filePath) return { ok: false, canceled: true };
+  try {
+    return db.exportBackup(filePath);
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
+
+ipcMain.handle('data:restore', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: 'Restore LedgerPro backup',
+    properties: ['openFile'],
+    filters: [{ name: 'LedgerPro backup / database', extensions: ['db'] }],
+  });
+  if (canceled || !filePaths || !filePaths.length) return { ok: false, canceled: true };
+  try {
+    return db.restoreFrom(filePaths[0]);
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
