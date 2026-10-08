@@ -1170,7 +1170,8 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
-.amount-field > span:first-child {
+.amount-field > span:first-child,
+.amount-field > label:first-child {
   font-size: 12.5px;
   font-weight: 650;
   color: var(--ink-2);

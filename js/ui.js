@@ -71,7 +71,7 @@ const ICONS = {
   receipt:
     '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>',
   trash:
-    '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M9 7V4h6v3"/></svg>',
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M9 7V4h6v3"/></svg>',
   coin: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M14.5 9.5c0-1-1.1-1.7-2.5-1.7S9.5 8.5 9.5 9.6c0 2.4 5 1.3 5 3.8 0 1.1-1.1 1.8-2.5 1.8s-2.5-.7-2.5-1.8"/></svg>',
   chart: '<svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg>',
   scale:
@@ -94,16 +94,47 @@ function toast(message, type = 'success') {
   }, 2600);
 }
 
+let modalStart = null;
+
 function openModal(id) {
   const m = $('#' + id);
   m.hidden = false;
-  const first = m.querySelector('input:not([readonly]), select, textarea');
+  modalStart = document.activeElement;
+  const first = m.querySelector('input:not([readonly]), select, textarea, button');
   if (first) setTimeout(() => first.focus(), 60);
 }
 
 function closeModal(el) {
   const overlay = el.closest ? el.closest('.modal-overlay') : el;
   if (overlay) overlay.hidden = true;
+  if (modalStart && modalStart.focus && typeof modalStart.focus === 'function') modalStart.focus();
+  modalStart = null;
+}
+
+function focusTrap(e) {
+  if (e.key !== 'Tab') return;
+  const overlay = $$('.modal-overlay, #ledgerOverlay').find((o) => !o.hidden);
+  if (!overlay) return;
+  const focusables = Array.from(
+    overlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+  ).filter((el) => !el.disabled && el.offsetParent !== null);
+  if (!focusables.length) return;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (!overlay.contains(document.activeElement)) {
+    e.preventDefault();
+    first.focus();
+  } else if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', focusTrap, true);
 }
 
 const Prefs = {

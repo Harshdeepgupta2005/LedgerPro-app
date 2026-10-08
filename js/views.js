@@ -707,10 +707,10 @@ function renderAccounts() {
           <span class="cell-sub">${debitNormal ? 'Debit' : 'Credit'} balance</span></td>
         <td>
           <div class="row-actions">
-            <button class="icon-btn edit" data-edit-account="${attr(a.id)}" title="Edit account">
+            <button class="icon-btn edit" data-edit-account="${attr(a.id)}" title="Edit account" aria-label="Edit account">
               <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
             </button>
-            <button class="icon-btn danger" data-delete-account="${attr(a.id)}" title="Delete">${ICONS.trash}</button>
+            <button class="icon-btn danger" data-delete-account="${attr(a.id)}" title="Delete" aria-label="Delete account">${ICONS.trash}</button>
           </div>
         </td>
       </tr>`;
@@ -761,10 +761,10 @@ function renderLedger() {
         <td class="num"><strong class="${bal < 0 ? 'text-red' : ''}">${fmt(bal)}</strong></td>
         <td>
           <div class="row-actions">
-            <button class="icon-btn edit" data-edit-voucher="${attr(v.id)}" title="Edit entry">
+            <button class="icon-btn edit" data-edit-voucher="${attr(v.id)}" title="Edit entry" aria-label="Edit entry">
               <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
             </button>
-            <button class="icon-btn danger" data-delete-voucher="${attr(v.id)}" title="Delete entry">${ICONS.trash}</button>
+            <button class="icon-btn danger" data-delete-voucher="${attr(v.id)}" title="Delete entry" aria-label="Delete entry">${ICONS.trash}</button>
           </div>
         </td>
       </tr>`
@@ -849,7 +849,7 @@ function fillPrintLedger(a) {
     </div>
     <table class="pl-table">
       <thead>
-        <tr><th>Date</th><th>Voucher</th><th>Particulars</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr>
+        <tr><th scope="col">Date</th><th scope="col">Voucher</th><th scope="col">Particulars</th><th class="num" scope="col">Debit</th><th class="num" scope="col">Credit</th><th class="num" scope="col">Balance</th></tr>
       </thead>
       <tbody>
         <tr class="pl-strong"><td colspan="5">Opening balance</td><td class="num">${fmt(opening)}</td></tr>
@@ -974,7 +974,7 @@ function renderTrialBalance() {
     <div class="table-wrap">
       <table class="table">
         <thead>
-          <tr><th>Account</th><th>Group</th><th class="num">Debit</th><th class="num">Credit</th></tr>
+          <tr><th scope="col">Account</th><th scope="col">Group</th><th class="num" scope="col">Debit</th><th class="num" scope="col">Credit</th></tr>
         </thead>
         <tbody>${rows.join('') || '<tr><td colspan="4" class="empty">No balances to show.</td></tr>'}</tbody>
         <tfoot>
@@ -1045,7 +1045,7 @@ function renderPLStatement() {
     <div class="table-wrap">
       <table class="table">
         <thead>
-          <tr><th>Particulars</th><th class="num">Amount</th></tr>
+          <tr><th scope="col">Particulars</th><th class="num" scope="col">Amount</th></tr>
         </thead>
         <tbody>
           ${sectionRows(
@@ -1171,10 +1171,10 @@ function renderRegister() {
         <td class="num"><strong>${fmt(v.amount)}</strong></td>
         <td>
           <div class="row-actions">
-            <button class="icon-btn edit" data-edit-voucher="${attr(v.id)}" title="Edit entry">
+            <button class="icon-btn edit" data-edit-voucher="${attr(v.id)}" title="Edit entry" aria-label="Edit entry">
               <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
             </button>
-            <button class="icon-btn danger" data-delete-voucher="${attr(v.id)}" title="Delete">${ICONS.trash}</button>
+            <button class="icon-btn danger" data-delete-voucher="${attr(v.id)}" title="Delete" aria-label="Delete entry">${ICONS.trash}</button>
           </div>
         </td>
       </tr>`
