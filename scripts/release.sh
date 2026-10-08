@@ -45,6 +45,8 @@ npm test
 npm run check:native
 npm run test:persistence
 npm run smoke
+npx electron scripts/test-export.js
+npx electron scripts/test-reports.js
 
 echo "==> Bumping version in package.json"
 node -e "

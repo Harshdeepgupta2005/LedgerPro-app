@@ -1,7 +1,7 @@
 {
   "name": "ledgerpro",
   "productName": "LedgerPro",
-  "version": "1.5.0",
+  "version": "1.5.2",
   "description": "A simple, elegant desktop ledger app",
   "main": "main.js",
   "scripts": {

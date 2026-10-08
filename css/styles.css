@@ -680,6 +680,10 @@ textarea {
   color: var(--ink);
 }
 
+.icon-btn:active {
+  transform: translateY(1px);
+}
+
 /* ---------- Content / Views ---------- */
 
 .content {
@@ -1862,6 +1866,14 @@ tr[data-ledger] {
   gap: 8px;
 }
 
+.drawer-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border-strong);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
 .drawer-balance {
   display: flex;
   align-items: flex-end;
@@ -1951,6 +1963,7 @@ tr[data-ledger] {
   font-size: 13.5px;
   font-weight: 650;
   min-width: 250px;
+  max-width: min(360px, calc(100vw - 48px));
   animation: toast-in 0.3s var(--ease);
 }
 
@@ -2308,4 +2321,30 @@ tr[data-ledger] {
 
 .bs-empty {
   padding: 16px;
+}
+
+/* ---------- Motion & interaction polish ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  .view,
+  .drawer {
+    animation: none !important;
+  }
+}
+
+.btn:focus-visible,
+.icon-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.nav-item:active {
+  transform: scale(0.98);
 }

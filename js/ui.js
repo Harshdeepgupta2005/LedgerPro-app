@@ -1,7 +1,6 @@
 /* eslint-disable no-unused-vars --
-   ui.js exports shared helpers (<$>, <fmt>, <esc>, …) consumed by views.js/app.js in
-   the classic multi-script bundle. Migrated to ES modules in Phase 5, which removes
-   this cross-file limitation.
+   Classic multi-script bundle: top-level declarations here are globals shared with
+   views.js/app.js (ESM migration was evaluated and deferred — see Phase 5 notes).
 */
 
 const $ = (sel, root = document) => root.querySelector(sel);

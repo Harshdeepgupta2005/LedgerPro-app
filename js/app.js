@@ -11,6 +11,13 @@ const THEME_KEY = 'ledgerpro.theme';
 
 const NAV_KEYS = { d: 'dashboard', v: 'vouchers', a: 'accounts', g: 'register', r: 'reports', s: 'settings' };
 
+const viewHistory = [];
+
+function goBackView() {
+  const target = viewHistory.pop() || 'dashboard';
+  showView(target, { record: false });
+}
+
 let entryFocusTimer = null;
 
 function applyTheme(choice) {
@@ -50,8 +57,11 @@ function initTheme() {
   });
 }
 
-function showView(name) {
+function showView(name, { record = true } = {}) {
   if (!PAGE_META[name]) return;
+  if (record && state.view && state.view !== name && viewHistory[viewHistory.length - 1] !== state.view) {
+    viewHistory.push(state.view);
+  }
   state.view = name;
 
   $$('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
@@ -159,99 +169,67 @@ function openAccountModal(id) {
   openModal('accountModal');
 }
 
+function rejectEntry(message, field) {
+  const err = $('#entryError');
+  err.textContent = message;
+  err.hidden = false;
+  if (field) field.focus();
+  return false;
+}
+
 function submitEntry() {
   const f = $('#entryForm');
-  const err = $('#entryError');
-  err.hidden = true;
+  $('#entryError').hidden = true;
 
   if (!Store.db.accounts.length) {
-    err.textContent = 'Create at least one account first.';
-    err.hidden = false;
-    return false;
+    return rejectEntry('Create at least one account first.');
   }
 
   const drId = resolveLedger('dr', { commit: true });
   const crId = resolveLedger('cr', { commit: true });
   const mode = numberingMode();
+  const typedNo = () => f.no.value.trim();
+  const noExists = (no) => Store.db.vouchers.some((v) => v.no === no && v.id !== state.editingId);
 
   if (!state.editingId && mode === 'manual') {
-    const typed = f.no.value.trim();
-    if (!typed) {
-      err.textContent = 'Type a voucher number.';
-      err.hidden = false;
-      f.no.focus();
-      return false;
-    }
-    if (Store.db.vouchers.some((v) => v.no === typed)) {
-      err.textContent = `Voucher number ${typed} already exists.`;
-      err.hidden = false;
-      f.no.focus();
-      return false;
-    }
+    if (!typedNo()) return rejectEntry('Type a voucher number.', f.no);
+    if (noExists(typedNo())) return rejectEntry(`Voucher number ${typedNo()} already exists.`, f.no);
   }
   if (!state.editingId && mode === 'override') {
-    const typed = f.no.value.trim();
-    if (typed && Store.db.vouchers.some((v) => v.no === typed)) {
-      err.textContent = `Voucher number ${typed} already exists.`;
-      err.hidden = false;
-      f.no.focus();
-      return false;
-    }
+    const typed = typedNo();
+    if (typed && noExists(typed)) return rejectEntry(`Voucher number ${typed} already exists.`, f.no);
   }
 
-  if (!f.date.value) {
-    err.textContent = 'Choose a date for this voucher.';
-    err.hidden = false;
-    f.date.focus();
-    return false;
-  }
+  if (!f.date.value) return rejectEntry('Choose a date for this voucher.', f.date);
   if (!drId) {
-    err.textContent = f.dr.value.trim() ? ledgerSideError('dr', f.dr.value) : 'Choose a debit account.';
-    err.hidden = false;
-    f.dr.focus();
-    return false;
+    return rejectEntry(
+      f.dr.value.trim() ? ledgerSideError('dr', f.dr.value) : 'Choose a debit account.',
+      f.dr
+    );
   }
   if (!crId) {
-    err.textContent = f.cr.value.trim() ? ledgerSideError('cr', f.cr.value) : 'Choose a credit account.';
-    err.hidden = false;
-    f.cr.focus();
-    return false;
+    return rejectEntry(
+      f.cr.value.trim() ? ledgerSideError('cr', f.cr.value) : 'Choose a credit account.',
+      f.cr
+    );
   }
   if (drId === crId) {
-    err.textContent = 'Debit and credit accounts must be different.';
-    err.hidden = false;
-    f.dr.focus();
-    return false;
+    return rejectEntry('Debit and credit accounts must be different.', f.dr);
   }
 
   const amount = parseFloat(f.amount.value);
-  if (!amount || amount <= 0) {
-    err.textContent = 'Enter a valid amount.';
-    err.hidden = false;
-    f.amount.focus();
-    return false;
-  }
+  if (!amount || amount <= 0) return rejectEntry('Enter a valid amount.', f.amount);
 
   let no;
   if (state.editingId) {
-    const typed = f.no.value.trim();
-    if (numberingMode() === 'manual' && !typed) {
-      err.textContent = 'Type a voucher number.';
-      err.hidden = false;
-      f.no.focus();
-      return false;
-    }
+    const typed = typedNo();
+    if (mode === 'manual' && !typed) return rejectEntry('Type a voucher number.', f.no);
     no = typed || Store.nextVoucherNo(state.entryType);
-    if (Store.db.vouchers.some((v) => v.no === no && v.id !== state.editingId)) {
-      err.textContent = `Voucher number ${no} already exists.`;
-      err.hidden = false;
-      f.no.focus();
-      return false;
-    }
+    if (noExists(no)) return rejectEntry(`Voucher number ${no} already exists.`, f.no);
   } else if (mode === 'auto') {
     no = Store.nextVoucherNo(state.entryType);
   } else {
-    no = f.no.value.trim() || Store.nextVoucherNo(state.entryType);
+    no = typedNo() || Store.nextVoucherNo(state.entryType);
     f.no.value = no;
   }
 
@@ -443,7 +421,14 @@ function wireEvents() {
         clearRowNav();
         return;
       }
-      if (state.editingId) resetEntryForm();
+      if (state.editingId) {
+        resetEntryForm();
+        return;
+      }
+      if (!typing) {
+        e.preventDefault();
+        goBackView();
+      }
       return;
     }
 

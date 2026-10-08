@@ -80,6 +80,21 @@ app.whenReady().then(async () => {
   db.close();
   await sleep(1100);
 
+  // --- v1.4.0 upgrade: rows exist but the `initialized` flag was never written.
+  // Such a DB must load as initialized, never as a fresh (seedable) install ---
+  const Database = require('better-sqlite3');
+  const raw = new Database(path.join(TMP, 'ledger.db'));
+  raw.prepare("DELETE FROM meta WHERE key = 'initialized'").run();
+  raw.close();
+  await sleep(1100);
+
+  db.open();
+  const legacy = db.load();
+  check('rows without flag count as initialized', legacy.initialized === true);
+  check('rows without flag are preserved', legacy.accounts.length === 1 && legacy.vouchers.length === 1);
+  db.close();
+  await sleep(1100);
+
   // --- Clear books: empty state must survive a restart (regression for C1) ---
   db.open();
   db.save({

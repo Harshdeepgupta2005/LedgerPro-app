@@ -26,6 +26,7 @@ const browserGlobals = {
   leadingNumber: 'readonly',
   accountBalance: 'readonly',
   nextVoucherNo: 'readonly',
+  voucherNumberPrefix: 'readonly',
   ICONS: 'readonly',
   badge: 'readonly',
   toast: 'readonly',

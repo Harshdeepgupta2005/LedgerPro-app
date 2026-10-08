@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars --
-   data.js exports <Store> consumed by views.js/app.js in the classic multi-script
-   bundle. Migrated to ES modules in Phase 5.
+   Classic multi-script bundle: top-level declarations here are globals shared with
+   views.js/app.js (ESM migration was evaluated and deferred — see Phase 5 notes).
 */
 
 const DB_KEY = 'ledgerpro.db.v1';
@@ -56,6 +56,7 @@ const Store = {
   flushDelay: 200,
   _dirty: false,
   _flushTimer: null,
+  _diskBlocked: false,
 
   hasDiskBackend() {
     return typeof window !== 'undefined' && window.ledger && typeof window.ledger.dbSave === 'function';
@@ -78,7 +79,8 @@ const Store = {
         const doc = res.doc;
         if (doc && Array.isArray(doc.accounts) && Array.isArray(doc.vouchers)) {
           const local = readBackup();
-          if (doc.initialized) {
+          const hasBooks = doc.accounts.length > 0 || doc.vouchers.length > 0;
+          if (doc.initialized || hasBooks) {
             if (local && local.savedAt && doc.savedAt && local.savedAt > doc.savedAt) {
               this.db = local.db;
               this.backend = 'localstorage';
@@ -105,7 +107,17 @@ const Store = {
           return this.db;
         }
       }
-      if (res && !res.ok) console.error('SQLite load failed', res.error);
+      if (res && !res.ok) {
+        // Could not read the on-disk books: refuse to write anything back to disk,
+        // otherwise a failed load would be followed by a save that wipes the file.
+        console.error('SQLite load failed', res.error);
+        this._diskBlocked = true;
+        this.backend = 'localstorage';
+        this.warn(
+          'Could not read the database file — your changes are being kept in browser storage only.',
+          'error'
+        );
+      }
     }
 
     const legacy = readBackup();
@@ -143,7 +155,12 @@ const Store = {
     }
     if (!this._dirty) return Promise.resolve(true);
     this._dirty = false;
-    if (this.hasDiskBackend()) {
+    if (this.hasDiskBackend() && !this._diskBlocked) {
+      const persistFailed = () => {
+        this.backend = 'localstorage';
+        this.warn('Could not write to the database — changes are being kept in browser storage.', 'error');
+        return writeBackup(this.db);
+      };
       return window.ledger
         .dbSave(this.db)
         .then((res) => {
@@ -152,15 +169,9 @@ const Store = {
             this.backend = 'sqlite';
             return true;
           }
-          this.backend = 'localstorage';
-          this.warn('Could not write to the database — changes are being kept in browser storage.', 'error');
-          return writeBackup(this.db);
+          return persistFailed();
         })
-        .catch((e) => {
-          this.backend = 'localstorage';
-          this.warn('Could not write to the database — changes are being kept in browser storage.', 'error');
-          return writeBackup(this.db);
-        });
+        .catch(persistFailed);
     }
     this.backend = 'localstorage';
     return Promise.resolve(writeBackup(this.db));
@@ -216,13 +227,12 @@ const Store = {
   },
 
   renumberAll() {
-    const prefixOf = { Payment: 'PAY', Receipt: 'RCP', Contra: 'CNTR', Journal: 'JRN' };
     const sorted = [...this.db.vouchers].sort(
       (a, b) => a.date.localeCompare(b.date) || String(a.id).localeCompare(String(b.id))
     );
     const counters = {};
     for (const v of sorted) {
-      const prefix = prefixOf[v.type] || 'VCH';
+      const prefix = voucherNumberPrefix(v.type);
       counters[prefix] = (counters[prefix] || 0) + 1;
       v.no = `${prefix}-${String(counters[prefix]).padStart(4, '0')}`;
     }
@@ -345,7 +355,7 @@ function seedSampleData() {
   const counters = {};
   const vouchers = raw.map((v, i) => {
     counters[v.type] = (counters[v.type] || 0) + 1;
-    const prefix = { Payment: 'PAY', Receipt: 'RCP', Contra: 'CNTR', Journal: 'JRN' }[v.type];
+    const prefix = voucherNumberPrefix(v.type);
     return {
       id: 'v' + (i + 1),
       no: `${prefix}-${String(counters[v.type]).padStart(4, '0')}`,

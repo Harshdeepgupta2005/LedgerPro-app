@@ -126,13 +126,10 @@ function open() {
     CREATE INDEX IF NOT EXISTS idx_accounts_group ON accounts(group_name);
   `);
   migrate();
-  db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?) ON CONFLICT(key) DO NOTHING").run(
-    SCHEMA_VERSION
-  );
+  metaSet('schemaVersion', SCHEMA_VERSION);
   db.prepare("INSERT INTO meta (key, value) VALUES ('createdAt', ?) ON CONFLICT(key) DO NOTHING").run(
     new Date().toISOString()
   );
-  db.prepare("UPDATE meta SET value = ? WHERE key = 'schemaVersion'").run(SCHEMA_VERSION);
   makeBackup();
 }
 
@@ -158,7 +155,9 @@ function load() {
       narration: r.narration,
       createdAt: r.created_at || '',
     }));
-  const initialized = metaGet('initialized') === '1';
+  // Books written by v1.4.0 never persisted the `initialized` flag. Existing rows
+  // are proof of a real install — never treat them as a fresh (seedable) one.
+  const initialized = metaGet('initialized') === '1' || accounts.length > 0 || vouchers.length > 0;
   const savedAt = metaGet('savedAt') || '';
   const vSeq = Number(metaGet('nextVoucherSeq')) || 0;
   const aSeq = Number(metaGet('nextAccountSeq')) || 0;

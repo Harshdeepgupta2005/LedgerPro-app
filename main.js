@@ -82,30 +82,35 @@ app.on('before-quit', () => {
   db.close();
 });
 
-ipcMain.handle('export:save', async (event, { defaultName, filters, content }) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
-  const { canceled, filePath } = await dialog.showSaveDialog(win, {
-    title: 'Export',
-    defaultPath: defaultName,
-    filters: Array.isArray(filters) && filters.length ? filters : undefined,
-  });
-  if (canceled || !filePath) return { ok: false, canceled: true };
-  await fs.promises.writeFile(filePath, String(content ?? ''), 'utf8');
-  return { ok: true, path: filePath };
-});
+async function promptAndWrite(event, { title, defaultName, filters, content, pdfOptions }) {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title,
+      defaultPath: defaultName,
+      filters: Array.isArray(filters) && filters.length ? filters : undefined,
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    const data = pdfOptions ? await win.webContents.printToPDF(pdfOptions) : String(content ?? '');
+    await fs.promises.writeFile(filePath, data, pdfOptions ? undefined : 'utf8');
+    return { ok: true, path: filePath };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+}
 
-ipcMain.handle('export:pdf', async (event, { defaultName }) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
-  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+ipcMain.handle('export:save', (event, { defaultName, filters, content }) =>
+  promptAndWrite(event, { title: 'Export', defaultName, filters, content })
+);
+
+ipcMain.handle('export:pdf', (event, { defaultName }) =>
+  promptAndWrite(event, {
     title: 'Export PDF',
-    defaultPath: defaultName,
+    defaultName,
     filters: [{ name: 'PDF', extensions: ['pdf'] }],
-  });
-  if (canceled || !filePath) return { ok: false, canceled: true };
-  const data = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
-  await fs.promises.writeFile(filePath, data);
-  return { ok: true, path: filePath };
-});
+    pdfOptions: { printBackground: true, pageSize: 'A4' },
+  })
+);
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars --
-   views.js exports renderers + helpers consumed by app.js in the classic multi-script
-   bundle. Migrated to ES modules in Phase 5, which removes this cross-file limitation.
+   Classic multi-script bundle: top-level declarations here are globals shared with
+   app.js (ESM migration was evaluated and deferred — see Phase 5 notes).
 */
 
 const state = {
@@ -47,6 +47,28 @@ function inPeriod(v) {
   const p = state.period;
   if (!p) return true;
   return (!p.from || v.date >= p.from) && (!p.to || v.date <= p.to);
+}
+
+/* ---------- Shared row helpers ---------- */
+
+function byDateAsc(a, b) {
+  return a.date.localeCompare(b.date) || String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+}
+
+function byDateDesc(a, b) {
+  return byDateAsc(a, b) * -1;
+}
+
+const EDIT_ICON =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+
+function rowActionsHTML(kind, id) {
+  const label = kind === 'account' ? 'account' : 'entry';
+  return `
+        <div class="row-actions">
+          <button class="icon-btn edit" data-edit-${kind}="${attr(id)}" title="Edit ${label}" aria-label="Edit ${label}">${EDIT_ICON}</button>
+          <button class="icon-btn danger" data-delete-${kind}="${attr(id)}" title="Delete ${label}" aria-label="Delete ${label}">${ICONS.trash}</button>
+        </div>`;
 }
 
 function renderTopbarCal() {
@@ -212,13 +234,7 @@ function recentRowsHTML(list) {
 }
 
 function recentVouchers(limit) {
-  return Store.db.vouchers
-    .filter(inPeriod)
-    .sort(
-      (a, b) =>
-        b.date.localeCompare(a.date) || String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
-    )
-    .slice(0, limit);
+  return Store.db.vouchers.filter(inPeriod).sort(byDateDesc).slice(0, limit);
 }
 
 function renderRecent() {
@@ -441,10 +457,7 @@ function globalSearchMatches() {
     .filter((v) =>
       `${v.no} ${v.narration} ${Store.accountName(v.dr)} ${Store.accountName(v.cr)}`.toLowerCase().includes(q)
     )
-    .sort(
-      (a, b) =>
-        b.date.localeCompare(a.date) || String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
-    )
+    .sort(byDateDesc)
     .slice(0, 4);
   return { accounts, vouchers };
 }
@@ -705,14 +718,7 @@ function renderAccounts() {
         <td>${badge(a.type)}</td>
         <td class="num"><strong class="${bal < 0 ? 'text-red' : ''}">${fmt(bal)}</strong>
           <span class="cell-sub">${debitNormal ? 'Debit' : 'Credit'} balance</span></td>
-        <td>
-          <div class="row-actions">
-            <button class="icon-btn edit" data-edit-account="${attr(a.id)}" title="Edit account" aria-label="Edit account">
-              <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-            </button>
-            <button class="icon-btn danger" data-delete-account="${attr(a.id)}" title="Delete" aria-label="Delete account">${ICONS.trash}</button>
-          </div>
-        </td>
+        <td>${rowActionsHTML('account', a.id)}</td>
       </tr>`;
     })
     .join('');
@@ -721,12 +727,7 @@ function renderAccounts() {
 /* ---------- Ledger drawer ---------- */
 
 function ledgerEntries(accountId) {
-  return Store.db.vouchers
-    .filter((v) => v.dr === accountId || v.cr === accountId)
-    .sort(
-      (a, b) =>
-        a.date.localeCompare(b.date) || String(a.createdAt || '').localeCompare(String(b.createdAt || ''))
-    );
+  return Store.db.vouchers.filter((v) => v.dr === accountId || v.cr === accountId).sort(byDateAsc);
 }
 
 function ledgerRowsData(a) {
@@ -759,14 +760,7 @@ function renderLedger() {
         <td class="num">${isDebit ? `<strong>${fmt(v.amount)}</strong>` : '—'}</td>
         <td class="num">${!isDebit ? `<strong>${fmt(v.amount)}</strong>` : '—'}</td>
         <td class="num"><strong class="${bal < 0 ? 'text-red' : ''}">${fmt(bal)}</strong></td>
-        <td>
-          <div class="row-actions">
-            <button class="icon-btn edit" data-edit-voucher="${attr(v.id)}" title="Edit entry" aria-label="Edit entry">
-              <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-            </button>
-            <button class="icon-btn danger" data-delete-voucher="${attr(v.id)}" title="Delete entry" aria-label="Delete entry">${ICONS.trash}</button>
-          </div>
-        </td>
+        <td>${rowActionsHTML('voucher', v.id)}</td>
       </tr>`
   );
 
@@ -887,8 +881,9 @@ function exportLedgerCSV() {
     })
     .then((res) => {
       if (res && res.ok) toast('Ledger exported as CSV');
+      else if (res && res.error) toast('CSV export failed: ' + res.error, 'error');
     })
-    .catch(() => toast('Could not export CSV', 'error'));
+    .catch((e) => toast('Could not export CSV' + (e && e.message ? ': ' + e.message : ''), 'error'));
 }
 
 function exportLedgerPDF() {
@@ -902,8 +897,9 @@ function exportLedgerPDF() {
     .printPDF({ defaultName: `${exportFileBase(a)}-ledger.pdf` })
     .then((res) => {
       if (res && res.ok) toast('Ledger exported as PDF');
+      else if (res && res.error) toast('PDF export failed: ' + res.error, 'error');
     })
-    .catch(() => toast('Could not export PDF', 'error'));
+    .catch((e) => toast('Could not export PDF' + (e && e.message ? ': ' + e.message : ''), 'error'));
 }
 
 /* ---------- Reports ---------- */
@@ -1077,6 +1073,16 @@ function renderBalanceSheet() {
   const range = asOfRange();
   const { net } = plFigures(range);
 
+  // Retained earnings carried in opening balances: a credit opening on an Income
+  // account or a debit opening on an Expense account is prior-period capital.
+  let retainedOpening = 0;
+  for (const a of Store.db.accounts) {
+    const op = Number(a.opening) || 0;
+    if (a.group === 'Income') retainedOpening += op;
+    else if (a.group === 'Expenses') retainedOpening -= op;
+  }
+  const capital = net + retainedOpening;
+
   const panel = (title, group) => {
     let total = 0;
     const rows = Store.db.accounts
@@ -1098,7 +1104,7 @@ function renderBalanceSheet() {
 
   const assets = panel('Assets', 'Assets');
   const liab = panel('Liabilities', 'Liabilities');
-  const liabilitiesTotal = liab.total + net;
+  const liabilitiesTotal = liab.total + capital;
   const offBy = Math.abs(assets.total - liabilitiesTotal);
   const balanced = offBy < 0.005;
 
@@ -1107,6 +1113,15 @@ function renderBalanceSheet() {
       <div class="bs-panel">
         <div class="bs-head">Liabilities &amp; Capital</div>
         ${liab.rows || '<div class="bs-empty muted">No balances.</div>'}
+        ${
+          retainedOpening === 0
+            ? ''
+            : `
+        <div class="bs-note">
+          ${retainedOpening >= 0 ? 'Add' : 'Less'} opening balance of Income/Expense
+          <strong class="num" data-total-retained="${retainedOpening}">${fmt(Math.abs(retainedOpening))}</strong>
+        </div>`
+        }
         <div class="bs-note">
           ${net >= 0 ? 'Add' : 'Less'} Net ${net >= 0 ? 'Profit' : 'Loss'}
           <strong class="num" data-total-net="${net}">${fmt(Math.abs(net))}</strong>
@@ -1139,10 +1154,7 @@ function filteredRegister() {
         `${v.no} ${v.narration} ${Store.accountName(v.dr)} ${Store.accountName(v.cr)} ${v.amount}`.toLowerCase();
       return hay.includes(q);
     })
-    .sort(
-      (a, b) =>
-        b.date.localeCompare(a.date) || String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
-    );
+    .sort(byDateDesc);
 }
 
 function renderRegister() {
@@ -1169,14 +1181,7 @@ function renderRegister() {
           <span class="cell-sub">${esc(v.narration || '—')}</span>
         </td>
         <td class="num"><strong>${fmt(v.amount)}</strong></td>
-        <td>
-          <div class="row-actions">
-            <button class="icon-btn edit" data-edit-voucher="${attr(v.id)}" title="Edit entry" aria-label="Edit entry">
-              <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-            </button>
-            <button class="icon-btn danger" data-delete-voucher="${attr(v.id)}" title="Delete" aria-label="Delete entry">${ICONS.trash}</button>
-          </div>
-        </td>
+        <td>${rowActionsHTML('voucher', v.id)}</td>
       </tr>`
     )
     .join('');
