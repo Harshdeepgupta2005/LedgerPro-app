@@ -1,0 +1,59 @@
+{
+  "name": "ledgerpro",
+  "productName": "LedgerPro",
+  "version": "1.4.0",
+  "description": "A simple, elegant desktop ledger app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "prestart": "node scripts/check-native.js",
+    "predev": "node scripts/check-native.js",
+    "dist": "electron-builder --mac",
+    "smoke": "LEDGERPRO_SMOKE=1 electron .",
+    "release": "bash scripts/release.sh",
+    "rebuild:electron": "cd node_modules/better-sqlite3 && ../../node_modules/.bin/node-gyp rebuild --release --target=33.4.11 --arch=arm64 --runtime=electron --dist-url=https://electronjs.org/headers"
+  },
+  "build": {
+    "appId": "com.ledgerpro.desktop",
+    "productName": "LedgerPro",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "**/*",
+      "!dist",
+      "!build/**",
+      "!scripts/**",
+      "!diag*.tmp.js",
+      "!*.tmp.js",
+      "!LOGO.png"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**"
+    ],
+    "npmRebuild": false,
+    "mac": {
+      "category": "public.app-category.finance",
+      "icon": "icon.icns",
+      "target": [
+        "dmg"
+      ],
+      "identity": null
+    },
+    "dmg": {
+      "writeUpdateInfo": false
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^26.15.3"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0"
+  }
+}
