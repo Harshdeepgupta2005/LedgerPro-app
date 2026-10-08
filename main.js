@@ -18,8 +18,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
-    }
+      nodeIntegration: false,
+    },
   });
 
   win.loadFile('index.html');
@@ -78,7 +78,7 @@ ipcMain.handle('export:save', async (event, { defaultName, filters, content }) =
   const { canceled, filePath } = await dialog.showSaveDialog(win, {
     title: 'Export',
     defaultPath: defaultName,
-    filters: Array.isArray(filters) && filters.length ? filters : undefined
+    filters: Array.isArray(filters) && filters.length ? filters : undefined,
   });
   if (canceled || !filePath) return { ok: false, canceled: true };
   await fs.promises.writeFile(filePath, String(content ?? ''), 'utf8');
@@ -90,7 +90,7 @@ ipcMain.handle('export:pdf', async (event, { defaultName }) => {
   const { canceled, filePath } = await dialog.showSaveDialog(win, {
     title: 'Export PDF',
     defaultPath: defaultName,
-    filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    filters: [{ name: 'PDF', extensions: ['pdf'] }],
   });
   if (canceled || !filePath) return { ok: false, canceled: true };
   const data = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });

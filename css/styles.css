@@ -1,6 +1,6 @@
 :root {
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   --sidebar-w: 244px;
   --topbar-h: 78px;
@@ -43,7 +43,7 @@
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-[data-theme="dark"] {
+[data-theme='dark'] {
   --bg: #0a1020;
   --surface: #111a2e;
   --surface-2: #17223a;
@@ -84,7 +84,7 @@ html {
   color-scheme: light;
 }
 
-html[data-theme="dark"] {
+html[data-theme='dark'] {
   color-scheme: dark;
 }
 
@@ -245,7 +245,10 @@ textarea {
   font-size: 13.5px;
   font-weight: 550;
   text-align: left;
-  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease;
 }
 
 .nav-item svg {
@@ -313,7 +316,10 @@ textarea {
   place-items: center;
   color: var(--sidebar-ink);
   background: rgba(255, 255, 255, 0.06);
-  transition: background 0.16s ease, color 0.16s ease, transform 0.3s var(--ease);
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    transform 0.3s var(--ease);
 }
 
 .theme-toggle:hover {
@@ -328,11 +334,11 @@ textarea {
 }
 
 .theme-toggle .icon-sun,
-[data-theme="dark"] .theme-toggle .icon-moon {
+[data-theme='dark'] .theme-toggle .icon-moon {
   display: none;
 }
 
-[data-theme="dark"] .theme-toggle .icon-sun {
+[data-theme='dark'] .theme-toggle .icon-sun {
   display: block;
 }
 
@@ -399,7 +405,9 @@ textarea {
   padding: 0 13px;
   height: 40px;
   width: 100%;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
 .search:focus-within {
@@ -588,8 +596,12 @@ textarea {
   font-size: 13.5px;
   font-weight: 650;
   white-space: nowrap;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease,
-    transform 0.12s ease, box-shadow 0.16s ease;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.12s ease,
+    box-shadow 0.16s ease;
 }
 
 .btn:active {
@@ -658,7 +670,9 @@ textarea {
   display: grid;
   place-items: center;
   color: var(--ink-3);
-  transition: background 0.14s ease, color 0.14s ease;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
 }
 
 .icon-btn:hover {
@@ -757,11 +771,14 @@ textarea {
   box-shadow: var(--shadow);
   padding: 19px;
   overflow: hidden;
-  transition: transform 0.2s var(--ease), box-shadow 0.2s ease, border-color 0.2s ease;
+  transition:
+    transform 0.2s var(--ease),
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .stat::after {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0 0 auto;
   height: 3px;
@@ -891,11 +908,7 @@ textarea {
   gap: 10px;
   height: 200px;
   padding-top: 10px;
-  background-image: repeating-linear-gradient(
-    to top,
-    var(--border) 0 1px,
-    transparent 1px 25%
-  );
+  background-image: repeating-linear-gradient(to top, var(--border) 0 1px, transparent 1px 25%);
   border-radius: 8px;
 }
 
@@ -922,7 +935,9 @@ textarea {
   width: 15px;
   border-radius: 6px 6px 3px 3px;
   min-height: 4px;
-  transition: height 0.5s var(--ease), filter 0.15s ease;
+  transition:
+    height 0.5s var(--ease),
+    filter 0.15s ease;
 }
 
 .chart-group:hover .bar {
@@ -1046,22 +1061,22 @@ textarea {
   transform: translateY(-1px);
 }
 
-.vtab.active[data-type="Payment"] {
+.vtab.active[data-type='Payment'] {
   background: linear-gradient(180deg, #f8716f, var(--red));
   box-shadow: 0 8px 18px -10px rgba(240, 68, 56, 0.9);
 }
 
-.vtab.active[data-type="Receipt"] {
+.vtab.active[data-type='Receipt'] {
   background: linear-gradient(180deg, #34d399, var(--green));
   box-shadow: 0 8px 18px -10px rgba(18, 183, 106, 0.9);
 }
 
-.vtab.active[data-type="Contra"] {
+.vtab.active[data-type='Contra'] {
   background: linear-gradient(180deg, #60a5fa, var(--blue));
   box-shadow: 0 8px 18px -10px rgba(46, 144, 250, 0.9);
 }
 
-.vtab.active[data-type="Journal"] {
+.vtab.active[data-type='Journal'] {
   background: linear-gradient(180deg, #fbbf24, var(--amber));
   box-shadow: 0 8px 18px -10px rgba(247, 144, 9, 0.9);
 }
@@ -1169,7 +1184,10 @@ textarea {
   border: 1.5px solid var(--border);
   border-radius: 16px;
   padding: 14px 18px;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
 }
 
 .amount-input:focus-within {
@@ -1213,7 +1231,7 @@ textarea {
   margin: 0;
 }
 
-.amount-input input[type="number"] {
+.amount-input input[type='number'] {
   -moz-appearance: textfield;
 }
 
@@ -1621,7 +1639,10 @@ tr[data-ledger] {
   border-radius: 12px;
   background: var(--surface-2);
   outline: none;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
 }
 
 ::placeholder {
@@ -2068,7 +2089,7 @@ tr[data-ledger] {
     display: block;
     background: #fff;
     color: #111;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 
   .pl-head h1 {
@@ -2149,7 +2170,10 @@ tr[data-ledger] {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 18px;
-  transition: transform 0.16s var(--ease), border-color 0.16s ease, box-shadow 0.16s ease;
+  transition:
+    transform 0.16s var(--ease),
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
 .report-card:hover {

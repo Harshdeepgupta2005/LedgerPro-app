@@ -1,564 +1,650 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'" />
-  <title>LedgerPro</title>
-  <link rel="icon" type="image/png" href="assets/icon-256.png" />
-  <link rel="stylesheet" href="css/styles.css" />
-</head>
-<body>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark"><img src="assets/icon-48.png" alt="" /></div>
-        <div class="brand-text">
-          <strong>LedgerPro</strong>
-          <span>Desktop Ledger</span>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'"
+    />
+    <title>LedgerPro</title>
+    <link rel="icon" type="image/png" href="assets/icon-256.png" />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark"><img src="assets/icon-48.png" alt="" /></div>
+          <div class="brand-text">
+            <strong>LedgerPro</strong>
+            <span>Desktop Ledger</span>
+          </div>
         </div>
-      </div>
 
-      <nav class="nav" id="nav">
-        <button class="nav-item active" data-view="dashboard" data-nav-key="d" title="Dashboard (D)">
-          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-          <span><span class="nav-key">D</span>ashboard</span>
-        </button>
-        <button class="nav-item" data-view="vouchers" data-nav-key="v" title="Voucher Entry (V)">
-          <svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
-          <span><span class="nav-key">V</span>oucher Entry</span>
-        </button>
-        <button class="nav-item" data-view="accounts" data-nav-key="a" title="Accounts (A)">
-          <svg viewBox="0 0 24 24"><path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1"/><path d="M16 14h.01"/></svg>
-          <span><span class="nav-key">A</span>ccounts</span>
-        </button>
-        <button class="nav-item" data-view="register" data-nav-key="g" title="Voucher Register (G)">
-          <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
-          <span>Voucher Re<span class="nav-key">g</span>ister</span>
-        </button>
-        <button class="nav-item" data-view="reports" data-nav-key="r" title="Reports (R)">
-          <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg>
-          <span><span class="nav-key">R</span>eports</span>
-        </button>
-
-        <div class="nav-label">General</div>
-
-        <button class="nav-item" data-view="settings" data-nav-key="s" title="Settings (S)">
-          <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="9" cy="18" r="2"/></svg>
-          <span><span class="nav-key">S</span>ettings</span>
-        </button>
-      </nav>
-
-      <div class="sidebar-footer">
-        <button class="theme-toggle" id="themeToggle" title="Toggle theme">
-          <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
-          <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-        </button>
-        <div class="sidebar-meta">
-          <span id="appVersionLabel">v1.0.0</span>
-          <span>Local SQLite</span>
-        </div>
-      </div>
-    </aside>
-
-    <main class="main">
-      <header class="topbar" id="topbar">
-        <div class="page-heading">
-          <h1 id="pageTitle">Dashboard</h1>
-          <p id="pageSub">Overview of your books</p>
-        </div>
-        <div class="search" id="searchBox">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <input type="text" id="searchInput" placeholder="Search accounts & vouchers…" autocomplete="off" />
-          <button type="button" class="search-clear" id="searchClear" aria-label="Clear search" hidden>
-            <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        <nav class="nav" id="nav">
+          <button class="nav-item active" data-view="dashboard" data-nav-key="d" title="Dashboard (D)">
+            <svg viewBox="0 0 24 24">
+              <rect x="3" y="3" width="7" height="7" rx="1.5" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" />
+            </svg>
+            <span><span class="nav-key">D</span>ashboard</span>
           </button>
-          <div class="global-results" id="globalResults" hidden></div>
+          <button class="nav-item" data-view="vouchers" data-nav-key="v" title="Voucher Entry (V)">
+            <svg viewBox="0 0 24 24">
+              <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+              <path d="M14 3v5h5" />
+              <path d="M9 13h6M9 17h4" />
+            </svg>
+            <span><span class="nav-key">V</span>oucher Entry</span>
+          </button>
+          <button class="nav-item" data-view="accounts" data-nav-key="a" title="Accounts (A)">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 7H5a2 2 0 0 1 0-4h13v4" />
+              <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1" />
+              <path d="M16 14h.01" />
+            </svg>
+            <span><span class="nav-key">A</span>ccounts</span>
+          </button>
+          <button class="nav-item" data-view="register" data-nav-key="g" title="Voucher Register (G)">
+            <svg viewBox="0 0 24 24">
+              <rect x="4" y="3" width="16" height="18" rx="2" />
+              <path d="M8 8h8M8 12h8M8 16h5" />
+            </svg>
+            <span>Voucher Re<span class="nav-key">g</span>ister</span>
+          </button>
+          <button class="nav-item" data-view="reports" data-nav-key="r" title="Reports (R)">
+            <svg viewBox="0 0 24 24">
+              <path d="M3 3v18h18" />
+              <path d="M7 15v3M12 10v8M17 6v12" />
+            </svg>
+            <span><span class="nav-key">R</span>eports</span>
+          </button>
+
+          <div class="nav-label">General</div>
+
+          <button class="nav-item" data-view="settings" data-nav-key="s" title="Settings (S)">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+              <circle cx="9" cy="6" r="2" />
+              <circle cx="15" cy="12" r="2" />
+              <circle cx="9" cy="18" r="2" />
+            </svg>
+            <span><span class="nav-key">S</span>ettings</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+            <svg class="icon-sun" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="4" />
+              <path
+                d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+              />
+            </svg>
+            <svg class="icon-moon" viewBox="0 0 24 24">
+              <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+            </svg>
+          </button>
+          <div class="sidebar-meta">
+            <span id="appVersionLabel">v1.0.0</span>
+            <span>Local SQLite</span>
+          </div>
         </div>
-        <div class="topbar-spacer">
-          <div class="topbar-cal" id="topbarCal">
-            <button type="button" class="cal-date" id="calDateBtn" title="Change booking date (F2)">
-              <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M9 3v4M15 3v4M4 10h16"/></svg>
-              <strong id="calDateLabel">–</strong>
+      </aside>
+
+      <main class="main">
+        <header class="topbar" id="topbar">
+          <div class="page-heading">
+            <h1 id="pageTitle">Dashboard</h1>
+            <p id="pageSub">Overview of your books</p>
+          </div>
+          <div class="search" id="searchBox">
+            <svg viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Search accounts & vouchers…"
+              autocomplete="off"
+            />
+            <button type="button" class="search-clear" id="searchClear" aria-label="Clear search" hidden>
+              <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </button>
-            <button type="button" class="cal-period" id="calPeriodBtn" title="Select reporting period (⌘F2)">
-              <span id="calPeriodLabel">All time</span>
+            <div class="global-results" id="globalResults" hidden></div>
+          </div>
+          <div class="topbar-spacer">
+            <div class="topbar-cal" id="topbarCal">
+              <button type="button" class="cal-date" id="calDateBtn" title="Change booking date (F2)">
+                <svg viewBox="0 0 24 24">
+                  <rect x="4" y="5" width="16" height="16" rx="2" />
+                  <path d="M9 3v4M15 3v4M4 10h16" />
+                </svg>
+                <strong id="calDateLabel">–</strong>
+              </button>
+              <button
+                type="button"
+                class="cal-period"
+                id="calPeriodBtn"
+                title="Select reporting period (⌘F2)"
+              >
+                <span id="calPeriodLabel">All time</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div class="content" id="content">
+          <section class="view active" id="view-dashboard">
+            <div class="stat-grid" id="statGrid"></div>
+
+            <div class="grid-2">
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <h3>Income vs Expenses</h3>
+                    <p class="muted">Last 6 months</p>
+                  </div>
+                  <div class="legend">
+                    <span class="legend-item"><i class="dot dot-income"></i>Income</span>
+                    <span class="legend-item"><i class="dot dot-expense"></i>Expenses</span>
+                  </div>
+                </div>
+                <div class="chart" id="chart"></div>
+              </div>
+
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <h3>Recent Vouchers</h3>
+                    <p class="muted">Latest entries in the journal</p>
+                  </div>
+                  <button class="btn btn-ghost btn-sm" data-goto="register">View all</button>
+                </div>
+                <div class="recent-list" id="recentList"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="view-vouchers">
+            <div class="card entry-card">
+              <div class="voucher-type-tabs" id="voucherTabs">
+                <button class="vtab active" data-type="Payment" title="Payment — ⌥1">Payment</button>
+                <button class="vtab" data-type="Receipt" title="Receipt — ⌥2">Receipt</button>
+                <button class="vtab" data-type="Contra" title="Contra — ⌥3">Contra</button>
+                <button class="vtab" data-type="Journal" title="Journal — ⌥4">Journal</button>
+              </div>
+
+              <form id="entryForm" class="entry-form">
+                <div class="form-grid">
+                  <label class="field">
+                    <span>Voucher no</span>
+                    <input type="text" name="no" readonly />
+                  </label>
+                  <label class="field">
+                    <span>Date</span>
+                    <input type="date" name="date" required />
+                  </label>
+                </div>
+
+                <div class="entry-accounts">
+                  <label class="field">
+                    <span id="drLabel">Debit account</span>
+                    <input
+                      type="text"
+                      name="dr"
+                      autocomplete="off"
+                      spellcheck="false"
+                      placeholder="Type a ledger name…"
+                    />
+                    <input type="hidden" name="drId" />
+                    <span class="balance-hint" id="drHint"></span>
+                    <div class="ledger-suggest" id="drSuggest" hidden></div>
+                  </label>
+                  <label class="field">
+                    <span id="crLabel">Credit account</span>
+                    <input
+                      type="text"
+                      name="cr"
+                      autocomplete="off"
+                      spellcheck="false"
+                      placeholder="Type a ledger name…"
+                    />
+                    <input type="hidden" name="crId" />
+                    <span class="balance-hint" id="crHint"></span>
+                    <div class="ledger-suggest" id="crSuggest" hidden></div>
+                  </label>
+                </div>
+
+                <div class="field amount-field">
+                  <span>Amount</span>
+                  <div class="amount-input">
+                    <span class="currency">₹</span>
+                    <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" />
+                  </div>
+                  <span class="amount-words" id="amountWords"></span>
+                </div>
+
+                <label class="field">
+                  <span>Narration</span>
+                  <textarea name="narration" rows="2" placeholder="Description of the entry"></textarea>
+                </label>
+
+                <p class="form-error" id="entryError" hidden></p>
+
+                <div class="entry-actions">
+                  <div class="last-saved" id="lastSaved" hidden>
+                    <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></svg>
+                    <span id="lastSavedText"></span>
+                    <button type="button" class="undo-btn" id="undoLast">Undo</button>
+                  </div>
+                  <div class="entry-actions-right">
+                    <button type="button" class="btn btn-outline" id="clearEntry">Clear</button>
+                    <button type="submit" class="btn btn-primary" id="saveEntryBtn">Save Entry</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section class="view" id="view-accounts">
+            <div class="card">
+              <div class="card-head">
+                <div class="chips" id="accountChips">
+                  <button class="chip active" data-filter="all">All</button>
+                  <button class="chip" data-filter="Assets">Assets</button>
+                  <button class="chip" data-filter="Liabilities">Liabilities</button>
+                  <button class="chip" data-filter="Income">Income</button>
+                  <button class="chip" data-filter="Expenses">Expenses</button>
+                </div>
+                <button class="btn btn-primary btn-sm" id="newAccountBtn">
+                  <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+                  <span>Add Account</span>
+                </button>
+              </div>
+              <div class="table-wrap">
+                <table class="table" id="accountTable">
+                  <thead>
+                    <tr>
+                      <th>Account</th>
+                      <th>Group</th>
+                      <th>Type</th>
+                      <th class="num">Balance</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div class="empty" id="accountEmpty" hidden>
+                <p>No accounts match this filter.</p>
+              </div>
+            </div>
+            <p class="hint">
+              Click an account row to open its ledger, edit the opening balance and update entries.
+            </p>
+          </section>
+
+          <section class="view" id="view-register">
+            <div class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Voucher Register</h3>
+                  <p class="muted" id="registerSub">Every entry, newest first</p>
+                </div>
+                <div class="chips" id="registerChips">
+                  <button class="chip active" data-filter="all">All</button>
+                  <button class="chip" data-filter="Payment">Payment</button>
+                  <button class="chip" data-filter="Receipt">Receipt</button>
+                  <button class="chip" data-filter="Contra">Contra</button>
+                  <button class="chip" data-filter="Journal">Journal</button>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="table" id="registerTable">
+                  <thead>
+                    <tr>
+                      <th>Voucher No</th>
+                      <th>Date &amp; Time</th>
+                      <th>Type</th>
+                      <th>Particulars</th>
+                      <th class="num">Amount</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div class="empty" id="registerEmpty" hidden>
+                <p>No vouchers match this filter.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="view-reports">
+            <div class="card" id="reportPicker">
+              <div class="card-head">
+                <div>
+                  <h3>Choose a report</h3>
+                  <p class="muted">Pick the statement you want to open</p>
+                </div>
+              </div>
+              <div class="report-cards" id="reportCards">
+                <button class="report-card" data-report="trial">
+                  <span class="report-card-icon tint-indigo"
+                    ><svg viewBox="0 0 24 24">
+                      <path d="M3 3v18h18" />
+                      <path d="M7 15v3M12 10v8M17 6v12" /></svg
+                  ></span>
+                  <strong>Trial Balance</strong>
+                  <span class="muted">Debit and credit balances of all accounts</span>
+                </button>
+                <button class="report-card" data-report="pl">
+                  <span class="report-card-icon tint-green"
+                    ><svg viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7" /></svg
+                  ></span>
+                  <strong>Profit &amp; Loss Statement</strong>
+                  <span class="muted">Income and expenses for the period</span>
+                </button>
+                <button class="report-card" data-report="balance">
+                  <span class="report-card-icon tint-blue"
+                    ><svg viewBox="0 0 24 24">
+                      <path d="M12 3v18M7 21h10" />
+                      <path d="M5 7l-3 6h6zM19 7l-3 6h6z" />
+                      <path d="M5 7h14" /></svg
+                  ></span>
+                  <strong>Balance Sheet</strong>
+                  <span class="muted">Assets, liabilities and capital as of today</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="card" id="reportCard" hidden>
+              <div class="card-head">
+                <div>
+                  <h3 id="reportTitle">Report</h3>
+                  <p class="muted" id="reportSub"></p>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="reportBack">
+                  <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></svg>
+                  <span>All reports</span>
+                </button>
+              </div>
+              <div id="reportBody"></div>
+            </div>
+          </section>
+
+          <section class="view" id="view-settings">
+            <div class="grid-2">
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <h3>Appearance</h3>
+                    <p class="muted">Theme used across the app</p>
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <strong>Theme</strong>
+                    <p class="muted">Light, dark, or follow your system</p>
+                  </div>
+                  <div class="segmented" id="themeSegment">
+                    <button data-theme-choice="light">Light</button>
+                    <button data-theme-choice="dark">Dark</button>
+                    <button data-theme-choice="system">System</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <h3>Voucher Numbering</h3>
+                    <p class="muted">How voucher numbers get assigned</p>
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <strong>Numbering mode</strong>
+                    <p class="muted" id="numberingDesc">Assigned automatically, read-only</p>
+                  </div>
+                  <div class="segmented" id="numberingSegment">
+                    <button data-numbering="manual" title="You type every voucher number">Manual</button>
+                    <button data-numbering="auto" title="Assigned automatically, read-only">Auto</button>
+                    <button data-numbering="override" title="Auto-suggested, editable before save">
+                      Override
+                    </button>
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <strong>Rearrange all numbers</strong>
+                    <p class="muted">Rebuild every voucher number in date order, per type</p>
+                  </div>
+                  <button class="btn btn-outline btn-sm" id="renumberBtn">Rearrange</button>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <h3>Data</h3>
+                    <p class="muted">Stored locally on this device</p>
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <strong>Sample data</strong>
+                    <p class="muted">Restore the demo books</p>
+                  </div>
+                  <button class="btn btn-outline btn-sm" id="resetDataBtn">Reset</button>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <strong>Clear books</strong>
+                    <p class="muted">Start from an empty ledger</p>
+                  </div>
+                  <button class="btn btn-danger btn-sm" id="clearDataBtn">Clear</button>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <h3>About</h3>
+                    <p class="muted">Application information</p>
+                  </div>
+                </div>
+                <div class="about-list" id="aboutList"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div class="drawer-overlay" id="ledgerOverlay" hidden>
+      <aside class="drawer" id="ledgerDrawer" role="dialog" aria-modal="true" aria-labelledby="ledgerTitle">
+        <header class="drawer-head">
+          <div>
+            <p class="drawer-kicker">Ledger</p>
+            <h2 id="ledgerTitle">Account</h2>
+            <p class="muted" id="ledgerSub"></p>
+          </div>
+          <div class="drawer-actions">
+            <button class="btn btn-outline btn-sm" id="ledgerExportCSV" title="Export this ledger as CSV">
+              <svg viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5 12 14l4.5-4.5M5 20h14" /></svg>
+              <span>Export CSV</span>
+            </button>
+            <button class="btn btn-outline btn-sm" id="ledgerExportPDF" title="Export this ledger as PDF">
+              <svg viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5 12 14l4.5-4.5M5 20h14" /></svg>
+              <span>Export PDF</span>
+            </button>
+            <button class="btn btn-outline btn-sm" id="ledgerEditAccount">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+              </svg>
+              <span>Edit</span>
+            </button>
+            <button class="icon-btn" id="ledgerClose">
+              <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div class="content" id="content">
-        <section class="view active" id="view-dashboard">
-          <div class="stat-grid" id="statGrid"></div>
-
-          <div class="grid-2">
-            <div class="card">
-              <div class="card-head">
-                <div>
-                  <h3>Income vs Expenses</h3>
-                  <p class="muted">Last 6 months</p>
-                </div>
-                <div class="legend">
-                  <span class="legend-item"><i class="dot dot-income"></i>Income</span>
-                  <span class="legend-item"><i class="dot dot-expense"></i>Expenses</span>
-                </div>
-              </div>
-              <div class="chart" id="chart"></div>
-            </div>
-
-            <div class="card">
-              <div class="card-head">
-                <div>
-                  <h3>Recent Vouchers</h3>
-                  <p class="muted">Latest entries in the journal</p>
-                </div>
-                <button class="btn btn-ghost btn-sm" data-goto="register">View all</button>
-              </div>
-              <div class="recent-list" id="recentList"></div>
+        <div class="drawer-balance">
+          <div class="field opening-field">
+            <span>Opening balance (₹)</span>
+            <div class="opening-row">
+              <input type="number" step="0.01" id="ledgerOpening" />
+              <button class="btn btn-primary btn-sm" id="saveLedgerOpening">Save</button>
             </div>
           </div>
-        </section>
-
-        <section class="view" id="view-vouchers">
-          <div class="card entry-card">
-            <div class="voucher-type-tabs" id="voucherTabs">
-              <button class="vtab active" data-type="Payment" title="Payment — ⌥1">Payment</button>
-              <button class="vtab" data-type="Receipt" title="Receipt — ⌥2">Receipt</button>
-              <button class="vtab" data-type="Contra" title="Contra — ⌥3">Contra</button>
-              <button class="vtab" data-type="Journal" title="Journal — ⌥4">Journal</button>
-            </div>
-
-            <form id="entryForm" class="entry-form">
-              <div class="form-grid">
-                <label class="field">
-                  <span>Voucher no</span>
-                  <input type="text" name="no" readonly />
-                </label>
-                <label class="field">
-                  <span>Date</span>
-                  <input type="date" name="date" required />
-                </label>
-              </div>
-
-              <div class="entry-accounts">
-                <label class="field">
-                  <span id="drLabel">Debit account</span>
-                  <input type="text" name="dr" autocomplete="off" spellcheck="false"
-                         placeholder="Type a ledger name…" />
-                  <input type="hidden" name="drId" />
-                  <span class="balance-hint" id="drHint"></span>
-                  <div class="ledger-suggest" id="drSuggest" hidden></div>
-                </label>
-                <label class="field">
-                  <span id="crLabel">Credit account</span>
-                  <input type="text" name="cr" autocomplete="off" spellcheck="false"
-                         placeholder="Type a ledger name…" />
-                  <input type="hidden" name="crId" />
-                  <span class="balance-hint" id="crHint"></span>
-                  <div class="ledger-suggest" id="crSuggest" hidden></div>
-                </label>
-              </div>
-
-              <div class="field amount-field">
-                <span>Amount</span>
-                <div class="amount-input">
-                  <span class="currency">₹</span>
-                  <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" />
-                </div>
-                <span class="amount-words" id="amountWords"></span>
-              </div>
-
-              <label class="field">
-                <span>Narration</span>
-                <textarea name="narration" rows="2" placeholder="Description of the entry"></textarea>
-              </label>
-
-              <p class="form-error" id="entryError" hidden></p>
-
-              <div class="entry-actions">
-                <div class="last-saved" id="lastSaved" hidden>
-                  <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
-                  <span id="lastSavedText"></span>
-                  <button type="button" class="undo-btn" id="undoLast">Undo</button>
-                </div>
-                <div class="entry-actions-right">
-                  <button type="button" class="btn btn-outline" id="clearEntry">Clear</button>
-                  <button type="submit" class="btn btn-primary" id="saveEntryBtn">Save Entry</button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </section>
-
-        <section class="view" id="view-accounts">
-          <div class="card">
-            <div class="card-head">
-              <div class="chips" id="accountChips">
-                <button class="chip active" data-filter="all">All</button>
-                <button class="chip" data-filter="Assets">Assets</button>
-                <button class="chip" data-filter="Liabilities">Liabilities</button>
-                <button class="chip" data-filter="Income">Income</button>
-                <button class="chip" data-filter="Expenses">Expenses</button>
-              </div>
-              <button class="btn btn-primary btn-sm" id="newAccountBtn">
-                <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-                <span>Add Account</span>
-              </button>
-            </div>
-            <div class="table-wrap">
-              <table class="table" id="accountTable">
-                <thead>
-                  <tr>
-                    <th>Account</th>
-                    <th>Group</th>
-                    <th>Type</th>
-                    <th class="num">Balance</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-            <div class="empty" id="accountEmpty" hidden>
-              <p>No accounts match this filter.</p>
-            </div>
-          </div>
-          <p class="hint">Click an account row to open its ledger, edit the opening balance and update entries.</p>
-        </section>
-
-        <section class="view" id="view-register">
-          <div class="card">
-            <div class="card-head">
-              <div>
-                <h3>Voucher Register</h3>
-                <p class="muted" id="registerSub">Every entry, newest first</p>
-              </div>
-              <div class="chips" id="registerChips">
-                <button class="chip active" data-filter="all">All</button>
-                <button class="chip" data-filter="Payment">Payment</button>
-                <button class="chip" data-filter="Receipt">Receipt</button>
-                <button class="chip" data-filter="Contra">Contra</button>
-                <button class="chip" data-filter="Journal">Journal</button>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <table class="table" id="registerTable">
-                <thead>
-                  <tr>
-                    <th>Voucher No</th>
-                    <th>Date &amp; Time</th>
-                    <th>Type</th>
-                    <th>Particulars</th>
-                    <th class="num">Amount</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-            <div class="empty" id="registerEmpty" hidden>
-              <p>No vouchers match this filter.</p>
-            </div>
-          </div>
-        </section>
-
-        <section class="view" id="view-reports">
-          <div class="card" id="reportPicker">
-            <div class="card-head">
-              <div>
-                <h3>Choose a report</h3>
-                <p class="muted">Pick the statement you want to open</p>
-              </div>
-            </div>
-            <div class="report-cards" id="reportCards">
-              <button class="report-card" data-report="trial">
-                <span class="report-card-icon tint-indigo"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg></span>
-                <strong>Trial Balance</strong>
-                <span class="muted">Debit and credit balances of all accounts</span>
-              </button>
-              <button class="report-card" data-report="pl">
-                <span class="report-card-icon tint-green"><svg viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7"/></svg></span>
-                <strong>Profit &amp; Loss Statement</strong>
-                <span class="muted">Income and expenses for the period</span>
-              </button>
-              <button class="report-card" data-report="balance">
-                <span class="report-card-icon tint-blue"><svg viewBox="0 0 24 24"><path d="M12 3v18M7 21h10"/><path d="M5 7l-3 6h6zM19 7l-3 6h6z"/><path d="M5 7h14"/></svg></span>
-                <strong>Balance Sheet</strong>
-                <span class="muted">Assets, liabilities and capital as of today</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="card" id="reportCard" hidden>
-            <div class="card-head">
-              <div>
-                <h3 id="reportTitle">Report</h3>
-                <p class="muted" id="reportSub"></p>
-              </div>
-              <button class="btn btn-ghost btn-sm" id="reportBack">
-                <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-                <span>All reports</span>
-              </button>
-            </div>
-            <div id="reportBody"></div>
-          </div>
-        </section>
-
-        <section class="view" id="view-settings">
-          <div class="grid-2">
-            <div class="card">
-              <div class="card-head">
-                <div>
-                  <h3>Appearance</h3>
-                  <p class="muted">Theme used across the app</p>
-                </div>
-              </div>
-              <div class="setting-row">
-                <div>
-                  <strong>Theme</strong>
-                  <p class="muted">Light, dark, or follow your system</p>
-                </div>
-                <div class="segmented" id="themeSegment">
-                  <button data-theme-choice="light">Light</button>
-                  <button data-theme-choice="dark">Dark</button>
-                  <button data-theme-choice="system">System</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-head">
-                <div>
-                  <h3>Voucher Numbering</h3>
-                  <p class="muted">How voucher numbers get assigned</p>
-                </div>
-              </div>
-              <div class="setting-row">
-                <div>
-                  <strong>Numbering mode</strong>
-                  <p class="muted" id="numberingDesc">Assigned automatically, read-only</p>
-                </div>
-                <div class="segmented" id="numberingSegment">
-                  <button data-numbering="manual" title="You type every voucher number">Manual</button>
-                  <button data-numbering="auto" title="Assigned automatically, read-only">Auto</button>
-                  <button data-numbering="override" title="Auto-suggested, editable before save">Override</button>
-                </div>
-              </div>
-              <div class="setting-row">
-                <div>
-                  <strong>Rearrange all numbers</strong>
-                  <p class="muted">Rebuild every voucher number in date order, per type</p>
-                </div>
-                <button class="btn btn-outline btn-sm" id="renumberBtn">Rearrange</button>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-head">
-                <div>
-                  <h3>Data</h3>
-                  <p class="muted">Stored locally on this device</p>
-                </div>
-              </div>
-              <div class="setting-row">
-                <div>
-                  <strong>Sample data</strong>
-                  <p class="muted">Restore the demo books</p>
-                </div>
-                <button class="btn btn-outline btn-sm" id="resetDataBtn">Reset</button>
-              </div>
-              <div class="setting-row">
-                <div>
-                  <strong>Clear books</strong>
-                  <p class="muted">Start from an empty ledger</p>
-                </div>
-                <button class="btn btn-danger btn-sm" id="clearDataBtn">Clear</button>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-head">
-                <div>
-                  <h3>About</h3>
-                  <p class="muted">Application information</p>
-                </div>
-              </div>
-              <div class="about-list" id="aboutList"></div>
-            </div>
-          </div>
-        </section>
-      </div>
-    </main>
-  </div>
-
-  <div class="drawer-overlay" id="ledgerOverlay" hidden>
-    <aside class="drawer" id="ledgerDrawer" role="dialog" aria-modal="true" aria-labelledby="ledgerTitle">
-      <header class="drawer-head">
-        <div>
-          <p class="drawer-kicker">Ledger</p>
-          <h2 id="ledgerTitle">Account</h2>
-          <p class="muted" id="ledgerSub"></p>
-        </div>
-        <div class="drawer-actions">
-          <button class="btn btn-outline btn-sm" id="ledgerExportCSV" title="Export this ledger as CSV">
-            <svg viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5 12 14l4.5-4.5M5 20h14"/></svg>
-            <span>Export CSV</span>
-          </button>
-          <button class="btn btn-outline btn-sm" id="ledgerExportPDF" title="Export this ledger as PDF">
-            <svg viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5 12 14l4.5-4.5M5 20h14"/></svg>
-            <span>Export PDF</span>
-          </button>
-          <button class="btn btn-outline btn-sm" id="ledgerEditAccount">
-            <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-            <span>Edit</span>
-          </button>
-          <button class="icon-btn" id="ledgerClose">
-            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-          </button>
-        </div>
-      </header>
-
-      <div class="drawer-balance">
-        <div class="field opening-field">
-          <span>Opening balance (₹)</span>
-          <div class="opening-row">
-            <input type="number" step="0.01" id="ledgerOpening" />
-            <button class="btn btn-primary btn-sm" id="saveLedgerOpening">Save</button>
+          <div class="drawer-closing">
+            <span>Closing balance</span>
+            <strong id="ledgerClosing">₹0.00</strong>
           </div>
         </div>
-        <div class="drawer-closing">
-          <span>Closing balance</span>
-          <strong id="ledgerClosing">₹0.00</strong>
-        </div>
-      </div>
 
-      <div class="drawer-table">
-        <table class="table" id="ledgerTable">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Voucher</th>
-              <th>Particulars</th>
-              <th class="num">Debit</th>
-              <th class="num">Credit</th>
-              <th class="num">Balance</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="ledgerBody"></tbody>
-        </table>
-        <div class="empty" id="ledgerEmpty" hidden>
-          <p>No entries in this ledger yet.</p>
-          <button class="btn btn-primary btn-sm" id="ledgerNewEntry">Record an entry</button>
+        <div class="drawer-table">
+          <table class="table" id="ledgerTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Voucher</th>
+                <th>Particulars</th>
+                <th class="num">Debit</th>
+                <th class="num">Credit</th>
+                <th class="num">Balance</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="ledgerBody"></tbody>
+          </table>
+          <div class="empty" id="ledgerEmpty" hidden>
+            <p>No entries in this ledger yet.</p>
+            <button class="btn btn-primary btn-sm" id="ledgerNewEntry">Record an entry</button>
+          </div>
         </div>
-      </div>
-    </aside>
-  </div>
-
-  <div class="modal-overlay" id="accountModal" hidden>
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="accountModalTitle">
-      <div class="modal-head">
-        <h2 id="accountModalTitle">Add Account</h2>
-        <button class="icon-btn" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-      </div>
-      <form id="accountForm" class="modal-body">
-        <input type="hidden" name="id" />
-        <label class="field">
-          <span>Account name</span>
-          <input type="text" name="name" placeholder="e.g. Petty Cash" required />
-        </label>
-        <div class="form-grid">
-          <label class="field">
-            <span>Group</span>
-            <select name="group">
-              <option>Assets</option>
-              <option>Liabilities</option>
-              <option>Income</option>
-              <option>Expenses</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Type</span>
-            <select name="type">
-              <option>Cash</option>
-              <option>Bank</option>
-              <option>Receivable</option>
-              <option>Payable</option>
-              <option>Other</option>
-            </select>
-          </label>
-        </div>
-        <label class="field" id="openingField">
-          <span>Opening balance (₹)</span>
-          <input type="number" name="opening" step="0.01" placeholder="0.00" />
-        </label>
-        <p class="form-error" id="accountError" hidden></p>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-outline" data-close>Cancel</button>
-          <button type="submit" class="btn btn-primary" id="accountSaveBtn">Save Account</button>
-        </div>
-      </form>
+      </aside>
     </div>
-  </div>
 
-  <div class="modal-overlay" id="dateModal" hidden>
-    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="dateModalTitle">
-      <div class="modal-head">
-        <h2 id="dateModalTitle">Booking Date</h2>
-        <button class="icon-btn" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-      </div>
-      <form id="dateForm" class="modal-body">
-        <p class="muted">New vouchers will default to this date</p>
-        <label class="field">
-          <span>Date</span>
-          <input type="date" id="bookDateInput" />
-        </label>
-        <p class="form-error" id="dateModalError" hidden></p>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-outline" data-close>Cancel</button>
-          <button type="button" class="btn btn-outline" id="dateTodayBtn">Today</button>
-          <button type="submit" class="btn btn-primary" id="dateSaveBtn">Save</button>
+    <div class="modal-overlay" id="accountModal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="accountModalTitle">
+        <div class="modal-head">
+          <h2 id="accountModalTitle">Add Account</h2>
+          <button class="icon-btn" data-close>
+            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
         </div>
-      </form>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="periodModal" hidden>
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="periodModalTitle">
-      <div class="modal-head">
-        <h2 id="periodModalTitle">Reporting Period</h2>
-        <button class="icon-btn" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-      </div>
-      <form id="periodForm" class="modal-body">
-        <p class="muted">Reports cover transactions between these dates. Trial Balance and Balance Sheet show balances as of the end date.</p>
-        <div class="form-grid">
+        <form id="accountForm" class="modal-body">
+          <input type="hidden" name="id" />
           <label class="field">
-            <span>From</span>
-            <input type="date" id="periodFromInput" />
+            <span>Account name</span>
+            <input type="text" name="name" placeholder="e.g. Petty Cash" required />
           </label>
-          <label class="field">
-            <span>To</span>
-            <input type="date" id="periodToInput" />
+          <div class="form-grid">
+            <label class="field">
+              <span>Group</span>
+              <select name="group">
+                <option>Assets</option>
+                <option>Liabilities</option>
+                <option>Income</option>
+                <option>Expenses</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Type</span>
+              <select name="type">
+                <option>Cash</option>
+                <option>Bank</option>
+                <option>Receivable</option>
+                <option>Payable</option>
+                <option>Other</option>
+              </select>
+            </label>
+          </div>
+          <label class="field" id="openingField">
+            <span>Opening balance (₹)</span>
+            <input type="number" name="opening" step="0.01" placeholder="0.00" />
           </label>
-        </div>
-        <p class="form-error" id="periodModalError" hidden></p>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-outline" data-close>Cancel</button>
-          <button type="button" class="btn btn-outline" id="periodClearBtn">All time</button>
-          <button type="submit" class="btn btn-primary" id="periodSaveBtn">Apply Period</button>
-        </div>
-      </form>
+          <p class="form-error" id="accountError" hidden></p>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" data-close>Cancel</button>
+            <button type="submit" class="btn btn-primary" id="accountSaveBtn">Save Account</button>
+          </div>
+        </form>
+      </div>
     </div>
-  </div>
 
-  <div class="toast-stack" id="toastStack"></div>
+    <div class="modal-overlay" id="dateModal" hidden>
+      <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="dateModalTitle">
+        <div class="modal-head">
+          <h2 id="dateModalTitle">Booking Date</h2>
+          <button class="icon-btn" data-close>
+            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+        <form id="dateForm" class="modal-body">
+          <p class="muted">New vouchers will default to this date</p>
+          <label class="field">
+            <span>Date</span>
+            <input type="date" id="bookDateInput" />
+          </label>
+          <p class="form-error" id="dateModalError" hidden></p>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" data-close>Cancel</button>
+            <button type="button" class="btn btn-outline" id="dateTodayBtn">Today</button>
+            <button type="submit" class="btn btn-primary" id="dateSaveBtn">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
-  <div id="printLedger"></div>
+    <div class="modal-overlay" id="periodModal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="periodModalTitle">
+        <div class="modal-head">
+          <h2 id="periodModalTitle">Reporting Period</h2>
+          <button class="icon-btn" data-close>
+            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+        <form id="periodForm" class="modal-body">
+          <p class="muted">
+            Reports cover transactions between these dates. Trial Balance and Balance Sheet show balances as
+            of the end date.
+          </p>
+          <div class="form-grid">
+            <label class="field">
+              <span>From</span>
+              <input type="date" id="periodFromInput" />
+            </label>
+            <label class="field">
+              <span>To</span>
+              <input type="date" id="periodToInput" />
+            </label>
+          </div>
+          <p class="form-error" id="periodModalError" hidden></p>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" data-close>Cancel</button>
+            <button type="button" class="btn btn-outline" id="periodClearBtn">All time</button>
+            <button type="submit" class="btn btn-primary" id="periodSaveBtn">Apply Period</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
-  <script src="js/data.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/views.js"></script>
-  <script src="js/app.js"></script>
-</body>
+    <div class="toast-stack" id="toastStack"></div>
+
+    <div id="printLedger"></div>
+
+    <script src="js/data.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/views.js"></script>
+    <script src="js/app.js"></script>
+  </body>
 </html>

@@ -3,7 +3,15 @@
 const fs = require('fs');
 const path = require('path');
 
-const f = path.join(__dirname, '..', 'node_modules', 'better-sqlite3', 'build', 'Release', 'better_sqlite3.node');
+const f = path.join(
+  __dirname,
+  '..',
+  'node_modules',
+  'better-sqlite3',
+  'build',
+  'Release',
+  'better_sqlite3.node'
+);
 if (!fs.existsSync(f)) {
   console.error('better-sqlite3 native module missing.');
   console.error('Run: npm run rebuild:electron');

@@ -16,7 +16,11 @@ const pkg = require(path.join(APP_DIR, 'package.json'));
 // finish(), so in-process rm is unreliable — shell rm after exit always works).
 for (const name of fs.readdirSync(os.tmpdir())) {
   if (name.startsWith('ledgerpro-smoke-')) {
-    try { execFileSync('rm', ['-rf', path.join(os.tmpdir(), name)], { stdio: 'ignore' }); } catch (e) { /* ignore */ }
+    try {
+      execFileSync('rm', ['-rf', path.join(os.tmpdir(), name)], { stdio: 'ignore' });
+    } catch (e) {
+      /* ignore */
+    }
   }
 }
 
@@ -31,10 +35,20 @@ function finish(code, msg) {
   if (finished) return;
   finished = true;
   console.log(msg);
-  try { require(path.join(APP_DIR, 'db')).close(); } catch (e) { /* ignore */ }
+  try {
+    require(path.join(APP_DIR, 'db')).close();
+  } catch (e) {
+    /* ignore */
+  }
   const cleaner = spawn(
     'sh',
-    ['-c', 'i=0; while kill -0 "$1" 2>/dev/null && [ "$i" -lt 150 ]; do sleep 0.2; i=$((i+1)); done; rm -rf "$2"', 'sh', String(process.pid), ud],
+    [
+      '-c',
+      'i=0; while kill -0 "$1" 2>/dev/null && [ "$i" -lt 150 ]; do sleep 0.2; i=$((i+1)); done; rm -rf "$2"',
+      'sh',
+      String(process.pid),
+      ud,
+    ],
     { detached: true, stdio: 'ignore' }
   );
   cleaner.unref();
@@ -69,7 +83,9 @@ app.whenReady().then(async () => {
       ready = await evalIn(
         "typeof Store !== 'undefined' && Store.db && Array.isArray(Store.db.accounts) && Array.isArray(Store.db.vouchers)"
       );
-    } catch (e) { /* page still loading */ }
+    } catch (e) {
+      /* page still loading */
+    }
     if (ready) break;
     if (expired()) return finish(1, 'SMOKE_FAIL timeout waiting for Store to load');
     await sleep(150);
@@ -363,32 +379,40 @@ out.ui.rowsNav = { rowCount, hl, any: hl === 1 && rowCount >= 2 };
   if (!u.trial) failures.push('trial balance report missing');
   else {
     if (u.trial.title !== 'Trial Balance') failures.push(`trial title '${u.trial.title}'`);
-    if (Math.abs(u.trial.dr - u.expected.trialDr) > eps) failures.push(`trial DR ${u.trial.dr} != ${u.expected.trialDr}`);
-    if (Math.abs(u.trial.cr - u.expected.trialCr) > eps) failures.push(`trial CR ${u.trial.cr} != ${u.expected.trialCr}`);
+    if (Math.abs(u.trial.dr - u.expected.trialDr) > eps)
+      failures.push(`trial DR ${u.trial.dr} != ${u.expected.trialDr}`);
+    if (Math.abs(u.trial.cr - u.expected.trialCr) > eps)
+      failures.push(`trial CR ${u.trial.cr} != ${u.expected.trialCr}`);
   }
   if (!u.pl) failures.push('profit & loss report missing');
   else {
     if (u.pl.title !== 'Profit & Loss Statement') failures.push(`P&L title '${u.pl.title}'`);
-    if (Math.abs(u.pl.income - u.expected.income) > eps) failures.push(`P&L income ${u.pl.income} != ${u.expected.income}`);
-    if (Math.abs(u.pl.expense - u.expected.expense) > eps) failures.push(`P&L expense ${u.pl.expense} != ${u.expected.expense}`);
+    if (Math.abs(u.pl.income - u.expected.income) > eps)
+      failures.push(`P&L income ${u.pl.income} != ${u.expected.income}`);
+    if (Math.abs(u.pl.expense - u.expected.expense) > eps)
+      failures.push(`P&L expense ${u.pl.expense} != ${u.expected.expense}`);
     if (Math.abs(u.pl.net - u.expected.net) > eps) failures.push(`P&L net ${u.pl.net} != ${u.expected.net}`);
   }
   if (!u.balance) failures.push('balance sheet report missing');
   else {
     if (u.balance.title !== 'Balance Sheet') failures.push(`balance title '${u.balance.title}'`);
-    if (Math.abs(u.balance.assets - u.expected.assets) > eps) failures.push(`BS assets ${u.balance.assets} != ${u.expected.assets}`);
+    if (Math.abs(u.balance.assets - u.expected.assets) > eps)
+      failures.push(`BS assets ${u.balance.assets} != ${u.expected.assets}`);
     if (Math.abs(u.balance.liabilities - u.expected.liabilities) > eps) {
       failures.push(`BS liabilities ${u.balance.liabilities} != ${u.expected.liabilities}`);
     }
     if (Math.abs(u.balance.assets - u.balance.liabilities) > eps) {
-      failures.push(`BS does not balance: assets ${u.balance.assets} vs liabilities+capital ${u.balance.liabilities}`);
+      failures.push(
+        `BS does not balance: assets ${u.balance.assets} vs liabilities+capital ${u.balance.liabilities}`
+      );
     }
   }
   if (u.searchBarViews !== true) failures.push('global search bar not visible on every section');
   if (!u.resultsDrop) failures.push('global search dropdown did not list matching accounts');
   if (!u.resultsVisible) failures.push('global search dropdown not shown while typing');
   if (u.searchCleared !== true) failures.push('clear button did not reset the global search');
-  if (u.suggestShown !== true || !u.suggestItems) failures.push(`ledger suggestions missing (shown=${u.suggestShown} items=${u.suggestItems})`);
+  if (u.suggestShown !== true || !u.suggestItems)
+    failures.push(`ledger suggestions missing (shown=${u.suggestShown} items=${u.suggestItems})`);
   if (!u.suggestPicked) failures.push('suggestion select did not fill the ledger ids');
   if (!u.voucherSaved) failures.push('voucher could not be saved in smoke');
   if (!u.timeStored) failures.push('voucher recording time (createdAt) not stored');
@@ -399,7 +423,8 @@ out.ui.rowsNav = { rowCount, hl, any: hl === 1 && rowCount >= 2 };
   else {
     if (u.bookDateApplied !== true) failures.push(`booking date not saved (${u.bookDateApplied})`);
     if (u.bookDateLabel !== '05 Jan 2020') failures.push(`date label '${u.bookDateLabel}' != '05 Jan 2020'`);
-    if (u.voucherDefaultDate !== '2020-01-05') failures.push(`voucher default date '${u.voucherDefaultDate}' != 2020-01-05`);
+    if (u.voucherDefaultDate !== '2020-01-05')
+      failures.push(`voucher default date '${u.voucherDefaultDate}' != 2020-01-05`);
   }
   if (u.cmdKFocusedSearch !== true) failures.push('Cmd+K did not focus the global search');
   if (!u.periodModalOpened) failures.push('Cmd+F2 did not open the reporting-period popup');
@@ -407,35 +432,50 @@ out.ui.rowsNav = { rowCount, hl, any: hl === 1 && rowCount >= 2 };
   else {
     if (!u.periodTrial) failures.push('period-filtered trial balance missing');
     else {
-      if (Math.abs(u.periodTrial.dr - u.periodExpected.trialDr) > eps) failures.push(`period trial DR ${u.periodTrial.dr} != ${u.periodExpected.trialDr}`);
-      if (Math.abs(u.periodTrial.cr - u.periodExpected.trialCr) > eps) failures.push(`period trial CR ${u.periodTrial.cr} != ${u.periodExpected.trialCr}`);
-      if (Math.abs(u.periodTrial.dr - u.periodTrial.cr) > eps) failures.push(`period trial out of balance ${u.periodTrial.dr}/${u.periodTrial.cr}`);
+      if (Math.abs(u.periodTrial.dr - u.periodExpected.trialDr) > eps)
+        failures.push(`period trial DR ${u.periodTrial.dr} != ${u.periodExpected.trialDr}`);
+      if (Math.abs(u.periodTrial.cr - u.periodExpected.trialCr) > eps)
+        failures.push(`period trial CR ${u.periodTrial.cr} != ${u.periodExpected.trialCr}`);
+      if (Math.abs(u.periodTrial.dr - u.periodTrial.cr) > eps)
+        failures.push(`period trial out of balance ${u.periodTrial.dr}/${u.periodTrial.cr}`);
     }
     if (!u.periodPL) failures.push('period-filtered P&L missing');
     else {
-      if (Math.abs(u.periodPL.income - u.periodExpected.income) > eps) failures.push(`period P&L income ${u.periodPL.income} != ${u.periodExpected.income}`);
-      if (Math.abs(u.periodPL.expense - u.periodExpected.expense) > eps) failures.push(`period P&L expense ${u.periodPL.expense} != ${u.periodExpected.expense}`);
-      if (Math.abs(u.periodPL.net - u.periodExpected.plNet) > eps) failures.push(`period P&L net ${u.periodPL.net} != ${u.periodExpected.plNet}`);
+      if (Math.abs(u.periodPL.income - u.periodExpected.income) > eps)
+        failures.push(`period P&L income ${u.periodPL.income} != ${u.periodExpected.income}`);
+      if (Math.abs(u.periodPL.expense - u.periodExpected.expense) > eps)
+        failures.push(`period P&L expense ${u.periodPL.expense} != ${u.periodExpected.expense}`);
+      if (Math.abs(u.periodPL.net - u.periodExpected.plNet) > eps)
+        failures.push(`period P&L net ${u.periodPL.net} != ${u.periodExpected.plNet}`);
     }
     if (!u.periodBS) failures.push('period-filtered balance sheet missing');
     else {
-      if (Math.abs(u.periodBS.assets - u.periodExpected.assets) > eps) failures.push(`period BS assets ${u.periodBS.assets} != ${u.periodExpected.assets}`);
-      if (Math.abs(u.periodBS.liabilities - u.periodExpected.liabilities) > eps) failures.push(`period BS liabilities ${u.periodBS.liabilities} != ${u.periodExpected.liabilities}`);
-      if (Math.abs(u.periodBS.assets - u.periodBS.liabilities) > eps) failures.push(`period BS does not balance ${u.periodBS.assets}/${u.periodBS.liabilities}`);
+      if (Math.abs(u.periodBS.assets - u.periodExpected.assets) > eps)
+        failures.push(`period BS assets ${u.periodBS.assets} != ${u.periodExpected.assets}`);
+      if (Math.abs(u.periodBS.liabilities - u.periodExpected.liabilities) > eps)
+        failures.push(`period BS liabilities ${u.periodBS.liabilities} != ${u.periodExpected.liabilities}`);
+      if (Math.abs(u.periodBS.assets - u.periodBS.liabilities) > eps)
+        failures.push(`period BS does not balance ${u.periodBS.assets}/${u.periodBS.liabilities}`);
     }
   }
   if (u.periodCleared !== true) failures.push('clearing the period did not restore All time');
-  if (u.periodLabel && u.periodLabel.indexOf(' – ') < 0) failures.push(`period label '${u.periodLabel}' lacks range`);
+  if (u.periodLabel && u.periodLabel.indexOf(' – ') < 0)
+    failures.push(`period label '${u.periodLabel}' lacks range`);
 
-  if (u.registerPeriodRows !== u.registerPeriodExpected) failures.push(`register rows in period ${u.registerPeriodRows} != ${u.registerPeriodExpected}`);
-  if (!u.registerPeriodSub || u.registerPeriodSub.indexOf(' – ') < 0) failures.push(`register period sub '${u.registerPeriodSub}'`);
-  if (u.registerAllRows !== 0 + info.vouchers) failures.push(`register all rows ${u.registerAllRows} != ${info.vouchers}`);
-  if (u.registerAllSub !== 'Every entry, newest first') failures.push(`register all sub '${u.registerAllSub}'`);
+  if (u.registerPeriodRows !== u.registerPeriodExpected)
+    failures.push(`register rows in period ${u.registerPeriodRows} != ${u.registerPeriodExpected}`);
+  if (!u.registerPeriodSub || u.registerPeriodSub.indexOf(' – ') < 0)
+    failures.push(`register period sub '${u.registerPeriodSub}'`);
+  if (u.registerAllRows !== 0 + info.vouchers)
+    failures.push(`register all rows ${u.registerAllRows} != ${info.vouchers}`);
+  if (u.registerAllSub !== 'Every entry, newest first')
+    failures.push(`register all sub '${u.registerAllSub}'`);
   if (u.navLetters !== 'dashboard') failures.push(`letter nav ended at '${u.navLetters}'`);
   if (u.resultsShown !== true) failures.push('global search results did not open');
   if (u.resultsArrowMoved !== true) failures.push('ArrowDown did not move the search-result highlight');
   if (u.resultsOpenedLedger !== true) failures.push('Enter did not open the highlighted search result');
-  if (!u.rowsNav || u.rowsNav.any !== true) failures.push(`register row nav failed (${JSON.stringify(u.rowsNav)})`);
+  if (!u.rowsNav || u.rowsNav.any !== true)
+    failures.push(`register row nav failed (${JSON.stringify(u.rowsNav)})`);
   if (u.rowsEdit !== true) failures.push('Enter on a register row did not start editing');
   if (u.notTypingNav !== true) failures.push('letter nav did not jump to dashboard');
 
@@ -448,7 +488,7 @@ out.ui.rowsNav = { rowCount, hl, any: hl === 1 && rowCount >= 2 };
     } else if (disk.accounts.length !== info.accounts || disk.vouchers.length !== info.vouchers) {
       failures.push(
         `disk mismatch accounts=${disk.accounts.length}/${info.accounts} ` +
-        `vouchers=${disk.vouchers.length}/${info.vouchers}`
+          `vouchers=${disk.vouchers.length}/${info.vouchers}`
       );
     }
   } catch (e) {

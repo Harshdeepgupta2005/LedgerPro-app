@@ -7,10 +7,10 @@ contextBridge.exposeInMainWorld('ledger', {
   versions: {
     app: process.versions.electron,
     chrome: process.versions.chrome,
-    node: process.versions.node
+    node: process.versions.node,
   },
   saveFile: (options) => ipcRenderer.invoke('export:save', options),
   printPDF: (options) => ipcRenderer.invoke('export:pdf', options),
   dbLoad: () => ipcRenderer.sendSync('db:load'),
-  dbSave: (doc) => ipcRenderer.sendSync('db:save', doc)
+  dbSave: (doc) => ipcRenderer.sendSync('db:save', doc),
 });

@@ -19,15 +19,24 @@ function makeBackup() {
   if (!backupDir) return;
   try {
     fs.mkdirSync(backupDir, { recursive: true });
-    const rows = db.prepare('SELECT (SELECT COUNT(*) FROM accounts) AS a, (SELECT COUNT(*) FROM vouchers) AS v').get();
+    const rows = db
+      .prepare('SELECT (SELECT COUNT(*) FROM accounts) AS a, (SELECT COUNT(*) FROM vouchers) AS v')
+      .get();
     if (!rows.a && !rows.v) return;
     const target = path.join(backupDir, `ledger-${stamp()}.db`);
-    db.prepare("VACUUM INTO ?").run(target);
+    db.prepare('VACUUM INTO ?').run(target);
     const files = fs.readdirSync(backupDir).filter((f) => /^ledger-\d{8}-\d{6}\.db$/.test(f));
     if (files.length > BACKUP_KEEP) {
-      files.sort().slice(0, files.length - BACKUP_KEEP).forEach((f) => {
-        try { fs.unlinkSync(path.join(backupDir, f)); } catch (e) { /* ignore */ }
-      });
+      files
+        .sort()
+        .slice(0, files.length - BACKUP_KEEP)
+        .forEach((f) => {
+          try {
+            fs.unlinkSync(path.join(backupDir, f));
+          } catch (e) {
+            /* ignore */
+          }
+        });
     }
   } catch (e) {
     console.error('Backup failed', e);
@@ -67,8 +76,12 @@ function open() {
     CREATE INDEX IF NOT EXISTS idx_vouchers_date ON vouchers(date);
     CREATE INDEX IF NOT EXISTS idx_vouchers_type ON vouchers(type);
   `);
-  db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?) ON CONFLICT(key) DO NOTHING").run(SCHEMA_VERSION);
-  db.prepare("INSERT INTO meta (key, value) VALUES ('createdAt', ?) ON CONFLICT(key) DO NOTHING").run(new Date().toISOString());
+  db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?) ON CONFLICT(key) DO NOTHING").run(
+    SCHEMA_VERSION
+  );
+  db.prepare("INSERT INTO meta (key, value) VALUES ('createdAt', ?) ON CONFLICT(key) DO NOTHING").run(
+    new Date().toISOString()
+  );
   makeBackup();
 }
 
@@ -81,7 +94,16 @@ function load() {
   const vouchers = db
     .prepare('SELECT id, no, date, type, dr, cr, amount, narration FROM vouchers ORDER BY date, id')
     .all()
-    .map((r) => ({ id: r.id, no: r.no, date: r.date, type: r.type, dr: r.dr, cr: r.cr, amount: r.amount, narration: r.narration }));
+    .map((r) => ({
+      id: r.id,
+      no: r.no,
+      date: r.date,
+      type: r.type,
+      dr: r.dr,
+      cr: r.cr,
+      amount: r.amount,
+      narration: r.narration,
+    }));
   if (!accounts.length && !vouchers.length) return null;
   return { accounts, vouchers };
 }
@@ -100,7 +122,7 @@ function save(doc) {
     'INSERT INTO vouchers (id, no, date, type, dr, cr, amount, narration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const setMeta = db.prepare(
-    "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+    'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   );
 
   db.transaction(() => {
@@ -135,7 +157,11 @@ function save(doc) {
 
 function close() {
   if (!db) return;
-  try { db.close(); } catch (e) { /* ignore */ }
+  try {
+    db.close();
+  } catch (e) {
+    /* ignore */
+  }
   db = null;
 }
 

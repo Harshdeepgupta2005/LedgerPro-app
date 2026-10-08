@@ -1,3 +1,8 @@
+/* eslint-disable no-unused-vars --
+   views.js exports renderers + helpers consumed by app.js in the classic multi-script
+   bundle. Migrated to ES modules in Phase 5, which removes this cross-file limitation.
+*/
+
 const state = {
   view: 'dashboard',
   search: '',
@@ -13,7 +18,7 @@ const state = {
   period: null,
   suggest: { side: null, list: [], index: 0 },
   resultIndex: 0,
-  rowIndex: -1
+  rowIndex: -1,
 };
 
 /* ---------- Date helpers ---------- */
@@ -158,7 +163,7 @@ function renderChart() {
       key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
       label: d.toLocaleDateString('en-IN', { month: 'short' }),
       income: 0,
-      expense: 0
+      expense: 0,
     });
   }
   const byKey = Object.fromEntries(buckets.map((b) => [b.key, b]));
@@ -215,7 +220,10 @@ function recentRowsHTML(list) {
 function recentVouchers(limit) {
   return Store.db.vouchers
     .filter(inPeriod)
-    .sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+    .sort(
+      (a, b) =>
+        b.date.localeCompare(a.date) || String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+    )
     .slice(0, limit);
 }
 
@@ -224,7 +232,8 @@ function renderRecent() {
   const host = $('#recentList');
 
   if (!recent.length) {
-    host.innerHTML = '<div class="empty"><p>No vouchers yet.</p><button class="btn btn-primary btn-sm" data-goto="vouchers">Record the first entry</button></div>';
+    host.innerHTML =
+      '<div class="empty"><p>No vouchers yet.</p><button class="btn btn-primary btn-sm" data-goto="vouchers">Record the first entry</button></div>';
     return;
   }
 
@@ -240,16 +249,36 @@ const TYPE_META = {
     dr: 'Receiving account (Debit)',
     cr: 'Giving account (Credit)',
     drCashOnly: true,
-    crCashOnly: true
+    crCashOnly: true,
   },
-  Journal: { dr: 'Debit account (Dr)', cr: 'Credit account (Cr)' }
+  Journal: { dr: 'Debit account (Dr)', cr: 'Credit account (Cr)' },
 };
 
 function numToWords(num) {
   let n = Math.floor(Math.abs(num));
   if (n === 0) return 'Zero';
-  const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
-    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const a = [
+    '',
+    'One',
+    'Two',
+    'Three',
+    'Four',
+    'Five',
+    'Six',
+    'Seven',
+    'Eight',
+    'Nine',
+    'Ten',
+    'Eleven',
+    'Twelve',
+    'Thirteen',
+    'Fourteen',
+    'Fifteen',
+    'Sixteen',
+    'Seventeen',
+    'Eighteen',
+    'Nineteen',
+  ];
   const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
   const two = (x) => (x < 20 ? a[x] : b[Math.floor(x / 10)] + (x % 10 ? ' ' + a[x % 10] : ''));
   const three = (x) =>
@@ -300,7 +329,9 @@ function setSide(side, id) {
 }
 
 function matchLedger(side, text) {
-  const t = String(text || '').trim().toLowerCase();
+  const t = String(text || '')
+    .trim()
+    .toLowerCase();
   if (!t) return null;
   const list = ledgerList(side);
   const exact = list.filter((a) => a.name.toLowerCase() === t);
@@ -602,13 +633,7 @@ function balanceHintHTML(accountId, isDebit, amount) {
   const bal = Store.balanceOf(a.id);
   if (!amount) return `Balance ${fmt(bal)}`;
   const debitNormal = isDebitNormal(a);
-  const delta = isDebit
-    ? debitNormal
-      ? amount
-      : -amount
-    : debitNormal
-      ? -amount
-      : amount;
+  const delta = isDebit ? (debitNormal ? amount : -amount) : debitNormal ? -amount : amount;
   const after = bal + delta;
   return `Balance ${fmt(bal)} → <strong class="${after < 0 ? 'text-red' : ''}">${fmt(after)}</strong>`;
 }
@@ -775,7 +800,8 @@ function renderLedger() {
   $('#ledgerOpening').value = Number(a.opening) || 0;
 
   const data = ledgerRowsData(a);
-  const rows = data.map(({ v, isDebit, other, bal }) => `
+  const rows = data.map(
+    ({ v, isDebit, other, bal }) => `
       <tr data-row-voucher="${v.id}">
         <td>${fmtDate(v.date)}</td>
         <td class="mono">${esc(v.no)}</td>
@@ -791,7 +817,8 @@ function renderLedger() {
             <button class="icon-btn danger" data-delete-voucher="${v.id}" title="Delete entry">${ICONS.trash}</button>
           </div>
         </td>
-      </tr>`);
+      </tr>`
+  );
 
   $('#ledgerBody').innerHTML = rows.join('');
   $('#ledgerEmpty').hidden = rows.length > 0;
@@ -816,7 +843,12 @@ function closeLedger() {
 /* ---------- Ledger export ---------- */
 
 function exportFileBase(a) {
-  return a.name.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-') || 'ledger';
+  return (
+    a.name
+      .replace(/[^\w\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-') || 'ledger'
+  );
 }
 
 function ledgerCSV(a) {
@@ -828,11 +860,20 @@ function ledgerCSV(a) {
   const lines = [
     ['Ledger', `${a.name} (${a.group} · ${a.type})`].map(cell).join(','),
     ['Date', 'Voucher', 'Type', 'Particulars', 'Narration', 'Debit', 'Credit', 'Balance'].map(cell).join(','),
-    ['', 'Opening balance', '', '', '', '', '', round(opening)].map(cell).join(',')
+    ['', 'Opening balance', '', '', '', '', '', round(opening)].map(cell).join(','),
   ];
   for (const { v, isDebit, other, bal } of data) {
     lines.push(
-      [v.date, v.no, v.type, other, v.narration || '', isDebit ? v.amount : '', isDebit ? '' : v.amount, round(bal)]
+      [
+        v.date,
+        v.no,
+        v.type,
+        other,
+        v.narration || '',
+        isDebit ? v.amount : '',
+        isDebit ? '' : v.amount,
+        round(bal),
+      ]
         .map(cell)
         .join(',')
     );
@@ -887,7 +928,7 @@ function exportLedgerCSV() {
     .saveFile({
       defaultName: `${exportFileBase(a)}-ledger.csv`,
       filters: [{ name: 'CSV', extensions: ['csv'] }],
-      content: ledgerCSV(a)
+      content: ledgerCSV(a),
     })
     .then((res) => {
       if (res && res.ok) toast('Ledger exported as CSV');
@@ -915,7 +956,7 @@ function exportLedgerPDF() {
 const REPORT_META = {
   trial: { title: 'Trial Balance', sub: 'Debit and credit balances of all accounts' },
   pl: { title: 'Profit & Loss Statement', sub: 'Income and expenses for the period' },
-  balance: { title: 'Balance Sheet', sub: 'Assets, liabilities and capital as of today' }
+  balance: { title: 'Balance Sheet', sub: 'Assets, liabilities and capital as of today' },
 };
 
 function renderReports() {
@@ -987,12 +1028,14 @@ function renderTrialBalance() {
             <td class="num" data-total-dr="${totalDr}">${fmt(totalDr)}</td>
             <td class="num" data-total-cr="${totalCr}">${fmt(totalCr)}</td>
           </tr>
-          ${balanced
-            ? ''
-            : `
+          ${
+            balanced
+              ? ''
+              : `
           <tr class="off-balance">
             <td colspan="4">Out of balance by ${fmt(offBy)} — check opening balances.</td>
-          </tr>`}
+          </tr>`
+          }
         </tfoot>
       </table>
     </div>`;
@@ -1034,12 +1077,18 @@ function renderPLStatement() {
           <tr><th>Particulars</th><th class="num">Amount</th></tr>
         </thead>
         <tbody>
-          ${sectionRows('Income', Store.db.accounts.filter((a) => a.group === 'Income'))}
+          ${sectionRows(
+            'Income',
+            Store.db.accounts.filter((a) => a.group === 'Income')
+          )}
           <tr class="report-total">
             <td>Total Income</td>
             <td class="num" data-total-income="${income}">${fmt(income)}</td>
           </tr>
-          ${sectionRows('Expenses', Store.db.accounts.filter((a) => a.group === 'Expenses'))}
+          ${sectionRows(
+            'Expenses',
+            Store.db.accounts.filter((a) => a.group === 'Expenses')
+          )}
           <tr class="report-total">
             <td>Total Expenses</td>
             <td class="num" data-total-expense="${expense}">${fmt(expense)}</td>
@@ -1112,7 +1161,8 @@ function filteredRegister() {
     .filter(inPeriod)
     .filter((v) => {
       if (!q) return true;
-      const hay = `${v.no} ${v.narration} ${Store.accountName(v.dr)} ${Store.accountName(v.cr)} ${v.amount}`.toLowerCase();
+      const hay =
+        `${v.no} ${v.narration} ${Store.accountName(v.dr)} ${Store.accountName(v.cr)} ${v.amount}`.toLowerCase();
       return hay.includes(q);
     })
     .sort(
@@ -1163,14 +1213,12 @@ function renderRegister() {
 const NUMBERING_DESC = {
   auto: 'Assigned automatically, read-only',
   manual: 'You type every voucher number',
-  override: 'Auto-suggested, editable before save'
+  override: 'Auto-suggested, editable before save',
 };
 
 function renderNumberingSetting() {
   const mode = numberingMode();
-  $$('#numberingSegment button').forEach((b) =>
-    b.classList.toggle('active', b.dataset.numbering === mode)
-  );
+  $$('#numberingSegment button').forEach((b) => b.classList.toggle('active', b.dataset.numbering === mode));
   $('#numberingDesc').textContent = NUMBERING_DESC[mode] || NUMBERING_DESC.auto;
 }
 
@@ -1184,7 +1232,7 @@ function renderSettings() {
     ['Chromium', versions.chrome || 'n/a'],
     ['Node.js', versions.node || 'n/a'],
     ['Platform', info.platform || navigator.platform],
-    ['Storage', info.storage || 'Browser localStorage (UI preview)']
+    ['Storage', info.storage || 'Browser localStorage (UI preview)'],
   ]
     .map(([k, v]) => `<div class="about-row"><span>${k}</span><span>${esc(v)}</span></div>`)
     .join('');
@@ -1196,7 +1244,7 @@ const renderers = {
   accounts: renderAccounts,
   register: renderRegister,
   reports: renderReports,
-  settings: renderSettings
+  settings: renderSettings,
 };
 
 function renderCurrent() {

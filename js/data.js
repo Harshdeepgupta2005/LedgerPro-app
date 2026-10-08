@@ -1,3 +1,8 @@
+/* eslint-disable no-unused-vars --
+   data.js exports <Store> consumed by views.js/app.js in the classic multi-script
+   bundle. Migrated to ES modules in Phase 5.
+*/
+
 const DB_KEY = 'ledgerpro.db.v1';
 
 const Store = {
@@ -12,7 +17,11 @@ const Store = {
       const res = window.ledger.dbLoad();
       if (res && res.ok && res.doc && Array.isArray(res.doc.accounts) && Array.isArray(res.doc.vouchers)) {
         this.db = res.doc;
-        try { localStorage.removeItem(DB_KEY); } catch (e) { /* ignore */ }
+        try {
+          localStorage.removeItem(DB_KEY);
+        } catch (e) {
+          /* ignore */
+        }
         return this.db;
       }
       if (res && !res.ok) console.error('SQLite load failed', res.error);
@@ -41,7 +50,11 @@ const Store = {
     if (this.hasDiskBackend()) {
       const res = window.ledger.dbSave(this.db);
       if (res && res.ok) {
-        try { localStorage.removeItem(DB_KEY); } catch (e) { /* ignore */ }
+        try {
+          localStorage.removeItem(DB_KEY);
+        } catch (e) {
+          /* ignore */
+        }
         return true;
       }
       console.error('SQLite save failed, keeping a localStorage fallback', res && res.error);
@@ -171,7 +184,7 @@ const Store = {
       if (map[a.id] !== undefined) a.opening = map[a.id];
     }
     this.save();
-  }
+  },
 };
 
 function isoDate(monthsBack, day) {
@@ -198,7 +211,7 @@ function seedSampleData() {
     { id: 'acc8', name: 'Purchases', group: 'Expenses', type: 'Other', opening: 0 },
     { id: 'acc9', name: 'Rent', group: 'Expenses', type: 'Other', opening: 0 },
     { id: 'acc10', name: 'Salaries', group: 'Expenses', type: 'Other', opening: 0 },
-    { id: 'acc11', name: 'Internet & Utilities', group: 'Expenses', type: 'Other', opening: 0 }
+    { id: 'acc11', name: 'Internet & Utilities', group: 'Expenses', type: 'Other', opening: 0 },
   ];
 
   const raw = [];
@@ -209,8 +222,24 @@ function seedSampleData() {
   for (let m = 5; m >= 0; m--) {
     push(m, 3, 'Payment', 'acc9', 'acc1', 18500, 'Office rent');
     push(m, 6, 'Payment', 'acc10', 'acc2', 38000, 'Monthly salaries');
-    push(m, 9, 'Receipt', m % 2 === 0 ? 'acc2' : 'acc1', 'acc3', 45000 + m * 2500, 'Received from Gupta Textiles');
-    push(m, 12, 'Journal', m % 2 === 0 ? 'acc2' : 'acc3', 'acc6', 82000 + m * 4500, `Sales invoice #${1040 + (5 - m)}`);
+    push(
+      m,
+      9,
+      'Receipt',
+      m % 2 === 0 ? 'acc2' : 'acc1',
+      'acc3',
+      45000 + m * 2500,
+      'Received from Gupta Textiles'
+    );
+    push(
+      m,
+      12,
+      'Journal',
+      m % 2 === 0 ? 'acc2' : 'acc3',
+      'acc6',
+      82000 + m * 4500,
+      `Sales invoice #${1040 + (5 - m)}`
+    );
     push(m, 15, 'Payment', 'acc11', 'acc2', 4200 + (5 - m) * 180, 'Internet & electricity');
     push(m, 18, 'Payment', 'acc8', 'acc4', 24000 + m * 800, 'Purchase from Sharma Supplies');
     if (m % 2 === 0) {
@@ -232,7 +261,7 @@ function seedSampleData() {
     return {
       id: 'v' + (i + 1),
       no: `${prefix}-${String(counters[v.type]).padStart(4, '0')}`,
-      ...v
+      ...v,
     };
   });
 

@@ -1,10 +1,16 @@
+/* eslint-disable no-unused-vars --
+   ui.js exports shared helpers (<$>, <fmt>, <esc>, …) consumed by views.js/app.js in
+   the classic multi-script bundle. Migrated to ES modules in Phase 5, which removes
+   this cross-file limitation.
+*/
+
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 const inr = new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
-  maximumFractionDigits: 2
+  maximumFractionDigits: 2,
 });
 
 function fmt(amount) {
@@ -46,14 +52,18 @@ function esc(str) {
 }
 
 const ICONS = {
-  wallet: '<svg viewBox="0 0 24 24"><path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1"/><path d="M16 14h.01"/></svg>',
+  wallet:
+    '<svg viewBox="0 0 24 24"><path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1"/><path d="M16 14h.01"/></svg>',
   arrowDown: '<svg viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>',
   arrowUp: '<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
-  receipt: '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>',
-  trash: '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M9 7V4h6v3"/></svg>',
+  receipt:
+    '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>',
+  trash:
+    '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M9 7V4h6v3"/></svg>',
   coin: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M14.5 9.5c0-1-1.1-1.7-2.5-1.7S9.5 8.5 9.5 9.6c0 2.4 5 1.3 5 3.8 0 1.1-1.1 1.8-2.5 1.8s-2.5-.7-2.5-1.8"/></svg>',
   chart: '<svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg>',
-  scale: '<svg viewBox="0 0 24 24"><path d="M12 3v18M7 21h10"/><path d="M5 7l-3 6h6zM19 7l-3 6h6z"/><path d="M5 7h14"/></svg>'
+  scale:
+    '<svg viewBox="0 0 24 24"><path d="M12 3v18M7 21h10"/><path d="M5 7l-3 6h6zM19 7l-3 6h6z"/><path d="M5 7h14"/></svg>',
 };
 
 function badge(text) {
@@ -126,5 +136,5 @@ const Prefs = {
 
   setPeriod(p) {
     this.set('period', p);
-  }
+  },
 };

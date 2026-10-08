@@ -4,7 +4,7 @@ const PAGE_META = {
   accounts: { title: 'Accounts', sub: 'Groups, types and editable ledgers' },
   register: { title: 'Voucher Register', sub: 'Every entry, newest first, with the time it was recorded' },
   reports: { title: 'Reports', sub: 'Choose a statement, then view it' },
-  settings: { title: 'Settings', sub: 'Preferences and local data' }
+  settings: { title: 'Settings', sub: 'Preferences and local data' },
 };
 
 const THEME_KEY = 'ledgerpro.theme';
@@ -243,7 +243,7 @@ function submitEntry() {
     dr: drId,
     cr: crId,
     amount,
-    narration: f.narration.value.trim()
+    narration: f.narration.value.trim(),
   };
   if (!state.editingId) payload.createdAt = new Date().toISOString();
 
@@ -364,8 +364,7 @@ function wireEvents() {
   document.addEventListener('keydown', (e) => {
     const modalOpen = $$('.modal-overlay').some((o) => !o.hidden);
     const typing =
-      !!document.activeElement &&
-      /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+      !!document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
 
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
@@ -453,7 +452,11 @@ function wireEvents() {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
           e.preventDefault();
           if (state.rowIndex < 0) state.rowIndex = e.key === 'ArrowDown' ? 0 : rows.length - 1;
-          else state.rowIndex = Math.max(0, Math.min(rows.length - 1, state.rowIndex + (e.key === 'ArrowDown' ? 1 : -1)));
+          else
+            state.rowIndex = Math.max(
+              0,
+              Math.min(rows.length - 1, state.rowIndex + (e.key === 'ArrowDown' ? 1 : -1))
+            );
           setRowNav(rows);
           return;
         }
@@ -709,7 +712,7 @@ function wireEvents() {
         name,
         group: f.group.value,
         type: f.type.value,
-        opening: parseFloat(f.opening.value) || 0
+        opening: parseFloat(f.opening.value) || 0,
       });
       toast('Account updated');
     } else {
@@ -718,7 +721,7 @@ function wireEvents() {
         name,
         group: f.group.value,
         type: f.type.value,
-        opening: parseFloat(f.opening.value) || 0
+        opening: parseFloat(f.opening.value) || 0,
       });
       toast('Account created');
     }
