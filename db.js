@@ -138,7 +138,16 @@ function open() {
 function load() {
   if (!db) throw new Error('Database not open');
   const accounts = db
-    .prepare('SELECT id, name, group_name, type, opening FROM accounts ORDER BY id')
+    .prepare(
+      `SELECT id, name, group_name, type, opening FROM accounts
+       ORDER BY CASE group_name
+         WHEN 'Assets' THEN 1
+         WHEN 'Liabilities' THEN 2
+         WHEN 'Income' THEN 3
+         WHEN 'Expenses' THEN 4
+         ELSE 5
+       END, name COLLATE NOCASE ASC`
+    )
     .all()
     .map((r) => ({ id: r.id, name: r.name, group: r.group_name, type: r.type, opening: r.opening }));
   const vouchers = db

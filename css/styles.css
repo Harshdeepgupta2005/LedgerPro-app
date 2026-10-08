@@ -1827,6 +1827,7 @@ tr[data-ledger] {
   display: flex;
   flex-direction: column;
   animation: drawer-in 0.32s var(--ease);
+  -webkit-app-region: no-drag;
 }
 
 @keyframes drawer-in {

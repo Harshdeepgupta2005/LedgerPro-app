@@ -70,6 +70,12 @@ const Store = {
       account: Math.max(this.db.seqs && this.db.seqs.account ? this.db.seqs.account : 0, aMax),
     };
     this.seqs = this.db.seqs;
+    const groupOrder = { Assets: 1, Liabilities: 2, Income: 3, Expenses: 4 };
+    this.db.accounts.sort(
+      (a, b) =>
+        (groupOrder[a.group] || 5) - (groupOrder[b.group] || 5) ||
+        a.name.localeCompare(b.name, 'en', { sensitivity: 'base' })
+    );
   },
 
   load() {
@@ -86,6 +92,9 @@ const Store = {
               this.backend = 'localstorage';
               this.rebuildSeqs();
               this.warn('You had unsaved local changes — they have been restored.', 'error');
+              // Push the recovered copy straight back to the database so the
+              // on-disk books catch up instead of staying stale until the next edit.
+              this.save();
               return this.db;
             }
             this.db = doc;

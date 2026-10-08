@@ -158,7 +158,7 @@ function renderDashboard() {
         <span class="stat-label">Expenses</span>
         <span class="stat-icon tint-red">${ICONS.arrowUp}</span>
       </div>
-      <div class="stat-value text-red" data-card-expense="${expense}">${fmtCompact(expense)}</div>
+      <div class="stat-value text-red" data-card-expense="${expense}">${fmtCompact(Math.abs(expense))}</div>
       <div class="stat-sub">${statsSub}</div>
     </div>
     <div class="stat">
@@ -578,7 +578,7 @@ function assignVoucherNo({ clear = false } = {}) {
   }
 }
 
-function setEntryType(type, { resetAccounts = true } = {}) {
+function setEntryType(type, { resetAccounts = true, keepValid = false } = {}) {
   state.entryType = type;
   $$('#voucherTabs .vtab').forEach((t) => t.classList.toggle('active', t.dataset.type === type));
   $('#drLabel').textContent = TYPE_META[type].dr;
@@ -590,7 +590,20 @@ function setEntryType(type, { resetAccounts = true } = {}) {
     return;
   }
   assignVoucherNo({ clear: true });
-  syncLedgerFields({ preserve: !resetAccounts });
+  if (resetAccounts && keepValid) {
+    const meta = TYPE_META[type];
+    const keep = (side) => {
+      const id = sideHidden(side).value;
+      const a = id ? Store.account(id) : null;
+      if (!a) return '';
+      const cashOnly = side === 'dr' ? meta.drCashOnly : meta.crCashOnly;
+      return cashOnly && !isLiquid(a) ? '' : id;
+    };
+    setSide('dr', keep('dr'));
+    setSide('cr', keep('cr'));
+  } else {
+    syncLedgerFields({ preserve: !resetAccounts });
+  }
   applyNoFieldState();
 }
 

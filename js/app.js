@@ -215,7 +215,8 @@ function submitEntry() {
   if (state.editingId) {
     const typed = typedNo();
     if (mode === 'manual' && !typed) return rejectEntry('Type a voucher number.', f.no);
-    no = typed || Store.nextVoucherNo(state.entryType);
+    const pool = Store.db.vouchers.filter((v) => v.id !== state.editingId);
+    no = typed || nextVoucherNo(pool, state.entryType);
     if (noExists(no)) return rejectEntry(`Voucher number ${no} already exists.`, f.no);
   } else if (mode === 'auto') {
     no = Store.nextVoucherNo(state.entryType);
@@ -496,7 +497,7 @@ function wireEvents() {
       else if (['1', '2', '3', '4'].includes(e.key)) idx = Number(e.key) - 1;
       if (idx >= 0) {
         e.preventDefault();
-        setEntryType(['Payment', 'Receipt', 'Contra', 'Journal'][idx]);
+        setEntryType(['Payment', 'Receipt', 'Contra', 'Journal'][idx], { keepValid: true });
       }
     }
   });
@@ -561,7 +562,7 @@ function wireEvents() {
   $('#voucherTabs').addEventListener('click', (e) => {
     const tab = e.target.closest('.vtab');
     if (!tab || state.editingId) return;
-    setEntryType(tab.dataset.type);
+    setEntryType(tab.dataset.type, { keepValid: true });
   });
 
   $('#entryForm').addEventListener('input', (e) => {

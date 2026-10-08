@@ -2,6 +2,34 @@
 
 All notable changes to LedgerPro are documented here. Semantic versioning.
 
+## [1.5.4] - 2026-10-08
+
+### Fixed
+
+- **Export CSV / Export PDF buttons were not clickable with a real mouse.**
+  The ledger drawer's toolbar sits in the top 78px of the window, where the
+  top bar registers a macOS window-drag region; real clicks were consumed by
+  window dragging (injected test clicks bypassed this, hiding the bug).
+  The drawer is now marked `-webkit-app-region: no-drag`
+- Accounts page listed ledgers in scrambled order (`acc10` before `acc2`
+  because ids were sorted as text); accounts are now grouped
+  Assets → Liabilities → Income → Expenses and sorted by name
+- Switching the voucher type (tabs or Alt+1…4) no longer wipes the debit and
+  credit accounts you had already entered — each side is kept unless it is not
+  allowed for the new type
+- Editing a voucher in Override numbering with a cleared number no longer
+  reports "already exists" against the voucher's own number
+- A recovered browser-storage copy is now written back to the database
+  immediately on load, instead of waiting for the next edit
+- Corrected [1.5.3] note: database backups are taken at every launch
+  (userData `backups/`), not on every write
+
+### Changed
+
+- Dashboard "Expenses" card shows the expense magnitude (was displaying a
+  negative value like `-₹1.7K`); the raw signed figure stays on the
+  `data-card-expense` attribute for tests
+
 ## [1.5.3] - 2026-10-08
 
 ### Added
@@ -10,7 +38,8 @@ All notable changes to LedgerPro are documented here. Semantic versioning.
   Backup writes a portable SQLite copy (`LedgerPro-backup-<date>.db`) via
   `VACUUM INTO`; Restore validates the chosen file before replacing the active
   books (auto-backup first) and reloads the app
-- Backups are written on every successful DB write (kept in userData `backups/`)
+- A database backup is taken at every launch (kept in userData `backups/`,
+  newest 5 retained)
 
 ### Changed
 
