@@ -14,9 +14,10 @@ on your machine.
 - Dashboard with month/period income & expense summary and a 6-month chart
 - Global search across accounts and vouchers (Cmd+K), with keyboard navigation
 - CSV/PDF export for any ledger
-- SQLite storage with rolling backups (`~/Library/Application Support/LedgerPro/backups`)
+- SQLite storage with rolling backups (kept in the app's user-data folder)
 - Keyboard-first: Cmd+Enter to save, F2 booking date, Cmd+F2 reporting period,
   single-letter sidebar navigation
+- macOS (DMG) and Windows (NSIS installer); native window chrome on both
 
 ## Development
 
@@ -39,6 +40,28 @@ npm run rebuild:electron
 
 (Architecture is detected at release time; the manual script defaults to arm64.)
 
+## Building installers
+
+Native `better-sqlite3` must be rebuilt for the target OS, so build each installer
+on that OS (or via the CI matrix in `.github/workflows/ci.yml`, which does this
+automatically on push/tags and uploads the artifacts).
+
+```bash
+npm ci
+npm run dist:mac   # macOS  → dist/LedgerPro-<version>-<arch>.dmg
+npm run dist:win   # Windows → dist/LedgerPro-Setup-<version>.exe
+```
+
+Both scripts run `electron-builder install-app-deps` first to rebuild the native
+module for Electron. Do not attempt to cross-build a Windows installer from macOS —
+the bundled native module would be for the wrong OS. The Windows icon lives at
+`build/icon.ico`; the macOS icon at `build/icon.icns`.
+
+The macOS release flow (`npm run release`) is unchanged. Builds are unsigned by
+default: macOS triggers Gatekeeper quarantine, and Windows shows a SmartScreen
+prompt (click _More info → Run anyway_). Ship a code-signing certificate for a
+frictionless install.
+
 ## Release
 
 ```bash
@@ -53,9 +76,9 @@ purgates stale DMGs (keeps the 3 newest).
 
 ## Storage & backups
 
-- Database: `~/Library/Application Support/LedgerPro/ledger.db`
-- Backups: `~/Library/Application Support/LedgerPro/backups/ledger-<stamp>.db`
-  (up to 5 kept; saved on each write)
+- Database: the app's user-data folder — `~/Library/Application Support/LedgerPro/ledger.db`
+  (macOS) or `%APPDATA%\LedgerPro\ledger.db` (Windows)
+- Backups: `backups/ledger-<stamp>.db` alongside it (up to 5 kept; written at launch)
 - If SQLite is unavailable (e.g. wrong native ABI), the app transparently falls
   back to browser storage and warns you; the About dialog reports the active backend.
 

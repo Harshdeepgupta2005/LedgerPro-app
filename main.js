@@ -5,6 +5,24 @@ const db = require('./db');
 
 if (process.env.LEDGERPRO_SMOKE && !app.isPackaged) require('./scripts/smoke');
 
+const isMac = process.platform === 'darwin';
+const isWin = process.platform === 'win32';
+const TOPBAR_H = 78;
+
+// macOS keeps the inset traffic lights; Windows uses a hidden title bar with the
+// native window controls drawn as an overlay in the top bar; Linux keeps its
+// native frame. The renderer re-colours the Windows overlay on theme changes.
+function titleBarOptions() {
+  if (isMac) return { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 18, y: 16 } };
+  if (isWin) {
+    return {
+      titleBarStyle: 'hidden',
+      titleBarOverlay: { color: '#f1f3f9', symbolColor: '#0f172a', height: TOPBAR_H },
+    };
+  }
+  return {};
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
@@ -12,8 +30,7 @@ function createWindow() {
     minWidth: 980,
     minHeight: 640,
     show: false,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 18, y: 16 },
+    ...titleBarOptions(),
     backgroundColor: '#0f172a',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -49,6 +66,23 @@ ipcMain.handle('db:save', async (event, doc) => {
 
 ipcMain.on('app:version', (event) => {
   event.returnValue = app.getVersion();
+});
+
+// Windows-only: match the native window-control overlay to the active theme.
+ipcMain.on('win:overlay', (event, opts) => {
+  if (!isWin || !opts) return;
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && typeof win.setTitleBarOverlay === 'function') {
+    try {
+      win.setTitleBarOverlay({
+        color: String(opts.color || '#f1f3f9'),
+        symbolColor: String(opts.symbolColor || '#0f172a'),
+        height: TOPBAR_H,
+      });
+    } catch (e) {
+      /* ignore */
+    }
+  }
 });
 
 ipcMain.on('db:mode', (event) => {

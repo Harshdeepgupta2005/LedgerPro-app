@@ -1,7 +1,7 @@
 {
   "name": "ledgerpro",
   "productName": "LedgerPro",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "description": "A simple, elegant desktop ledger app",
   "main": "main.js",
   "scripts": {
@@ -11,6 +11,8 @@
     "predev": "npm run check:native",
     "check:native": "electron scripts/check-native.js",
     "dist": "electron-builder --mac",
+    "dist:mac": "electron-builder install-app-deps && electron-builder --mac",
+    "dist:win": "electron-builder install-app-deps && electron-builder --win",
     "smoke": "LEDGERPRO_SMOKE=1 electron .",
     "lint": "eslint db.js preload.js main.js js/*.js scripts/*.js",
     "lint:fix": "eslint db.js preload.js main.js js/*.js scripts/*.js --fix",
@@ -48,6 +50,20 @@
         "dmg"
       ],
       "identity": null
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "dmg": {
       "writeUpdateInfo": false

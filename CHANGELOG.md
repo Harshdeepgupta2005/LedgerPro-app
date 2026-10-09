@@ -2,6 +2,24 @@
 
 All notable changes to LedgerPro are documented here. Semantic versioning.
 
+## [1.5.5] - 2026-10-09
+
+### Added
+
+- Windows support: `npm run dist:win` builds an NSIS installer
+  (`LedgerPro-Setup-<version>.exe`), and the app now renders native window
+  chrome on Windows via a hidden title bar plus a window-control overlay that
+  follows the light/dark theme
+- Cross-platform CI matrix (`.github/workflows/ci.yml`) builds the macOS DMG on
+  `macos-latest` and the Windows installer on `windows-latest`, uploading both
+  as artifacts (native modules are rebuilt on each OS)
+
+### Changed
+
+- Installer icons: `build/icon.ico` added for Windows; macOS keeps `icon.icns`
+- README documents per-platform builds, user-data paths and the unsigned-build
+  caveats (Gatekeeper / SmartScreen)
+
 ## [1.5.4] - 2026-10-08
 
 ### Fixed

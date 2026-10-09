@@ -3,7 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -17,3 +19,34 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+
+  # Native modules (better-sqlite3) must be rebuilt for each target OS on that
+  # OS, so package the installers on native runners and upload them.
+  build:
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: dist:mac
+            artifact: LedgerPro-macOS
+            path: dist/*.dmg
+          - os: windows-latest
+            script: dist:win
+            artifact: LedgerPro-Windows
+            path: dist/*.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run ${{ matrix.script }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error

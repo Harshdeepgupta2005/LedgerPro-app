@@ -376,6 +376,17 @@ textarea {
   -webkit-app-region: no-drag;
 }
 
+/* Windows: native window controls (minimise/maximise/close) are drawn as an
+   overlay in the top-right, so keep the top bar's right side clear and drop the
+   gap the sidebar keeps for the macOS traffic lights. */
+.platform-win32 .topbar {
+  padding-right: 152px;
+}
+
+.platform-win32 .brand {
+  padding-top: 22px;
+}
+
 .page-heading h1 {
   font-size: 20px;
   font-weight: 750;

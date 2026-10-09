@@ -9,6 +9,18 @@ const PAGE_META = {
 
 const THEME_KEY = 'ledgerpro.theme';
 
+const OVERLAY_COLORS = {
+  light: { color: '#f1f3f9', symbolColor: '#0f172a' },
+  dark: { color: '#0a1020', symbolColor: '#e7ecf5' },
+};
+
+function syncTitleBarOverlay(resolved) {
+  const api = window.ledger;
+  if (!api || typeof api.setTitleBarOverlay !== 'function') return;
+  const c = OVERLAY_COLORS[resolved] || OVERLAY_COLORS.light;
+  api.setTitleBarOverlay({ color: c.color, symbolColor: c.symbolColor });
+}
+
 const NAV_KEYS = { d: 'dashboard', v: 'vouchers', a: 'accounts', g: 'register', r: 'reports', s: 'settings' };
 
 const viewHistory = [];
@@ -26,6 +38,7 @@ function applyTheme(choice) {
         : 'light'
       : choice;
   document.documentElement.dataset.theme = resolved;
+  syncTitleBarOverlay(resolved);
   $$('#themeSegment button').forEach((b) => {
     b.classList.toggle('active', b.dataset.themeChoice === choice);
   });
@@ -844,6 +857,8 @@ function wireEvents() {
 
 function init() {
   Store.notify = toast;
+  const platform = (window.ledger && window.ledger.platform) || '';
+  if (platform) document.documentElement.classList.add(`platform-${platform}`);
   window.addEventListener('pagehide', () => {
     if (typeof Store.flushNow === 'function') Store.flushNow();
   });
