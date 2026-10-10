@@ -63,6 +63,7 @@ const Store = {
   },
 
   rebuildSeqs() {
+    for (const a of this.db.accounts) normalizeAccount(a);
     const vMax = Math.max(0, ...this.db.vouchers.map((x) => leadingNumber(x.id)));
     const aMax = Math.max(0, ...this.db.accounts.map((x) => leadingNumber(x.id)));
     this.db.seqs = {
@@ -308,17 +309,87 @@ function isoDate(monthsBack, day) {
 
 function seedSampleData() {
   const accounts = [
-    { id: 'acc1', name: 'Cash in Hand', group: 'Assets', type: 'Cash', opening: 85000 },
-    { id: 'acc2', name: 'HDFC Bank — Current A/c', group: 'Assets', type: 'Bank', opening: 485000 },
-    { id: 'acc3', name: 'Sundry Debtors', group: 'Assets', type: 'Receivable', opening: 120000 },
-    { id: 'acc4', name: 'Sundry Creditors', group: 'Liabilities', type: 'Payable', opening: 95000 },
-    { id: 'acc5', name: "Owner's Capital", group: 'Liabilities', type: 'Other', opening: 595000 },
-    { id: 'acc6', name: 'Sales', group: 'Income', type: 'Other', opening: 0 },
-    { id: 'acc7', name: 'Interest Income', group: 'Income', type: 'Other', opening: 0 },
-    { id: 'acc8', name: 'Purchases', group: 'Expenses', type: 'Other', opening: 0 },
-    { id: 'acc9', name: 'Rent', group: 'Expenses', type: 'Other', opening: 0 },
-    { id: 'acc10', name: 'Salaries', group: 'Expenses', type: 'Other', opening: 0 },
-    { id: 'acc11', name: 'Internet & Utilities', group: 'Expenses', type: 'Other', opening: 0 },
+    {
+      id: 'acc1',
+      name: 'Cash in Hand',
+      group: 'Assets',
+      type: 'Cash',
+      category: 'Current Assets',
+      opening: 85000,
+    },
+    {
+      id: 'acc2',
+      name: 'HDFC Bank — Current A/c',
+      group: 'Assets',
+      type: 'Bank',
+      category: 'Current Assets',
+      opening: 485000,
+    },
+    {
+      id: 'acc3',
+      name: 'Sundry Debtors',
+      group: 'Assets',
+      type: 'Receivable',
+      category: 'Current Assets',
+      opening: 120000,
+    },
+    {
+      id: 'acc4',
+      name: 'Sundry Creditors',
+      group: 'Liabilities',
+      type: 'Payable',
+      category: 'Current Liabilities',
+      opening: 95000,
+    },
+    {
+      id: 'acc5',
+      name: "Owner's Capital",
+      group: 'Liabilities',
+      type: 'Other',
+      category: 'Equity',
+      opening: 595000,
+    },
+    {
+      id: 'acc6',
+      name: 'Sales',
+      group: 'Income',
+      type: 'Other',
+      category: 'Revenue from Operations',
+      opening: 0,
+    },
+    {
+      id: 'acc7',
+      name: 'Interest Income',
+      group: 'Income',
+      type: 'Other',
+      category: 'Other Income',
+      opening: 0,
+    },
+    {
+      id: 'acc8',
+      name: 'Purchases',
+      group: 'Expenses',
+      type: 'Other',
+      category: 'Cost of Materials & Purchases',
+      opening: 0,
+    },
+    { id: 'acc9', name: 'Rent', group: 'Expenses', type: 'Other', category: 'Other Expenses', opening: 0 },
+    {
+      id: 'acc10',
+      name: 'Salaries',
+      group: 'Expenses',
+      type: 'Other',
+      category: 'Employee Benefits',
+      opening: 0,
+    },
+    {
+      id: 'acc11',
+      name: 'Internet & Utilities',
+      group: 'Expenses',
+      type: 'Other',
+      category: 'Other Expenses',
+      opening: 0,
+    },
   ];
 
   const raw = [];

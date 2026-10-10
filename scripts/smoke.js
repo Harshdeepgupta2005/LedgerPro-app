@@ -58,9 +58,11 @@ function finish(code, msg) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 app.on('browser-window-created', (_event, win) => {
-  win.webContents.on('console-message', (_ev, details) => {
-    if (details && typeof details.level === 'number' && details.level >= 3) {
-      consoleErrors.push(String(details.message));
+  win.webContents.on('console-message', (_ev, level, message) => {
+    const lvl = typeof level === 'number' ? level : (level && level.level) || 0;
+    const msg = typeof message === 'string' ? message : (level && level.message) || '';
+    if (lvl >= 3) {
+      consoleErrors.push(String(msg));
     }
   });
 });

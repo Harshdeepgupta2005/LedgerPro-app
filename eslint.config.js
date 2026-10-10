@@ -27,8 +27,18 @@ const browserGlobals = {
   accountBalance: 'readonly',
   nextVoucherNo: 'readonly',
   voucherNumberPrefix: 'readonly',
+  REPORT_GROUPS: 'readonly',
+  CATEGORIES: 'readonly',
+  categoriesFor: 'readonly',
+  defaultCategory: 'readonly',
+  categoryRank: 'readonly',
+  normalizeAccount: 'readonly',
+  prevDate: 'readonly',
+  isLiquidType: 'readonly',
+  cashFlowStatement: 'readonly',
   ICONS: 'readonly',
   badge: 'readonly',
+  badgeClass: 'readonly',
   toast: 'readonly',
   openModal: 'readonly',
   closeModal: 'readonly',
@@ -110,6 +120,8 @@ const browserGlobals = {
   plFigures: 'readonly',
   renderPLStatement: 'readonly',
   renderBalanceSheet: 'readonly',
+  renderCashFlowStatement: 'readonly',
+  accountsByGroupAndCategory: 'readonly',
   filteredRegister: 'readonly',
   renderRegister: 'readonly',
   NUMBERING_DESC: 'readonly',
@@ -126,7 +138,7 @@ const browserGlobals = {
   submitEntry: 'readonly',
   wireEvents: 'readonly',
   init: 'readonly',
-  goToEntry: 'readonly'
+  goToEntry: 'readonly',
 };
 
 const nodeGlobals = {
@@ -136,12 +148,12 @@ const nodeGlobals = {
   __dirname: 'readonly',
   Buffer: 'readonly',
   global: 'readonly',
-  fetch: 'readonly'
+  fetch: 'readonly',
 };
 
 module.exports = [
   {
-    ignores: ['node_modules/**', 'dist/**', 'build/**', 'coverage/**']
+    ignores: ['node_modules/**', 'dist/**', 'build/**', 'coverage/**'],
   },
   js.configs.recommended,
   {
@@ -149,7 +161,7 @@ module.exports = [
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'script',
-      globals: browserGlobals
+      globals: browserGlobals,
     },
     rules: {
       'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none' }],
@@ -158,15 +170,15 @@ module.exports = [
       eqeqeq: ['error', 'smart'],
       'no-implied-eval': 'error',
       'no-throw-literal': 'error',
-      'no-redeclare': 'off'
-    }
+      'no-redeclare': 'off',
+    },
   },
   {
     files: ['*.js', 'scripts/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'commonjs',
-      globals: { ...nodeGlobals, ...browserGlobals }
+      globals: { ...nodeGlobals, ...browserGlobals },
     },
     rules: {
       'no-unused-vars': ['error', { args: 'none', caughtErrors: 'none' }],
@@ -174,7 +186,7 @@ module.exports = [
       'prefer-const': 'error',
       eqeqeq: ['error', 'smart'],
       'no-implied-eval': 'error',
-      'no-throw-literal': 'error'
-    }
-  }
+      'no-throw-literal': 'error',
+    },
+  },
 ];

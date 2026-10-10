@@ -59,9 +59,11 @@ setTimeout(() => {
 }, 45000);
 
 app.on('browser-window-created', (_e, win) => {
-  win.webContents.on('console-message', (_ev, details) => {
-    if (details && typeof details.level === 'number' && details.level >= 3) {
-      consoleErrors.push(String(details.message));
+  win.webContents.on('console-message', (_ev, level, message) => {
+    const lvl = typeof level === 'number' ? level : (level && level.level) || 0;
+    const msg = typeof message === 'string' ? message : (level && level.message) || '';
+    if (lvl >= 3) {
+      consoleErrors.push(String(msg));
     }
   });
 });
@@ -203,6 +205,57 @@ app.whenReady().then(async () => {
     collect('ui.bs.assets', aTot, out.expected.assets);
     collect('ui.bs.liabilities', lTot, out.expected.capital);
 
+    // ---- Cash flow (indirect, all-time): activities reconcile to cash change ----
+    const catOf = (a) =>
+      a.category ||
+      (a.group === 'Assets'
+        ? a.type === 'Cash' || a.type === 'Bank' || a.type === 'Receivable'
+          ? 'Current Assets'
+          : 'Non-Current Assets'
+        : a.group === 'Liabilities'
+          ? a.type === 'Payable'
+            ? 'Current Liabilities'
+            : 'Equity'
+          : a.group === 'Income'
+            ? 'Revenue from Operations'
+            : 'Other Expenses');
+    const cashAcct = (a) => a.group === 'Assets' && (a.type === 'Cash' || a.type === 'Bank');
+    let cfo = net;
+    let cfi = 0;
+    let cff = 0;
+    for (const a of accounts) {
+      const chng = bal(a, null) - (Number(a.opening) || 0);
+      if (a.group === 'Assets') {
+        if (cashAcct(a)) continue;
+        if (catOf(a) === 'Current Assets') cfo -= chng;
+        else cfi -= chng;
+      } else if (a.group === 'Liabilities') {
+        if (catOf(a) === 'Current Liabilities') cfo += chng;
+        else cff += chng;
+      }
+    }
+    let cashOpen = 0;
+    let cashClose = 0;
+    for (const a of accounts) {
+      if (!cashAcct(a)) continue;
+      cashOpen += Number(a.opening) || 0;
+      cashClose += bal(a, null);
+    }
+    const netCash = cfo + cfi + cff;
+    const cashChange = cashClose - cashOpen;
+    open('cashflow');
+    collect('cf.cfo', parseFloat(readData('cfo')), cfo, 0.005);
+    collect('cf.cfi', parseFloat(readData('cfi')), cfi, 0.005);
+    collect('cf.cff', parseFloat(readData('cff')), cff, 0.005);
+    collect('cf.net', parseFloat(readData('netcash')), netCash, 0.005);
+    collect('cf.reconcile', Math.abs(parseFloat(readData('netcash')) - cashChange), 0, 0.005);
+    collect('cf.close', parseFloat(readData('cash-close')), cashClose, 0.005);
+    out.expected.cfo = +cfo.toFixed(2);
+    out.expected.cfi = +cfi.toFixed(2);
+    out.expected.cff = +cff.toFixed(2);
+    out.expected.netCash = +netCash.toFixed(2);
+    out.expected.cashClose = +cashClose.toFixed(2);
+
     // ---- Bounded period: from first voucher to last voucher ----
     const dates = vouchers.map((v) => v.date).sort();
     const from = dates[0], to = dates[dates.length - 1];
@@ -241,16 +294,29 @@ app.whenReady().then(async () => {
     let liquid = 0;
     for (const a of accounts) if (a.type === 'Cash' || a.type === 'Bank') liquid += bal(a, null);
 
+    let liquidity = 0;
+    const isLiq = (a) => (typeof a.liquid === 'boolean' ? a.liquid : a.type === 'Cash' || a.type === 'Bank');
+    for (const a of accounts) {
+      const c = catOf(a);
+      if (c === 'Current Assets') {
+        if (isLiq(a)) liquidity += bal(a, null);
+      } else if (c === 'Current Liabilities') {
+        liquidity -= bal(a, null);
+      }
+    }
+
     showView('dashboard', { record: false });
     collect('dash.period.income', readCard('income'), pinc);
     collect('dash.period.expense', readCard('expense'), pexp);
     collect('dash.period.net', readCard('net'), pnet);
     collect('dash.liquid', readCard('liquid'), liquid);
+    collect('dash.liquidity', readCard('liquidity'), liquidity);
     out.ui.dashPeriod = {
       income: readCard('income'),
       expense: readCard('expense'),
       net: readCard('net'),
       liquid: readCard('liquid'),
+      liquidity: readCard('liquidity'),
     };
 
     // No period → cards show the current month (net basis)
@@ -282,29 +348,29 @@ app.whenReady().then(async () => {
 
   const escCheck = await evalIn(`(async () => {
     const fire = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    closeExitConfirm();
     showView('dashboard', { record: false });
-    showView('accounts');
-    fire();
-    const a = state.view;
-    fire();
-    const b = state.view;
-    showView('settings');
     showView('reports');
     openReport('trial');
     fire();
     const c = state.report;
+    const viewA = state.view;
     fire();
     const d = state.view;
-    showView('dashboard', { record: false });
-    return { a, b, c, d };
+    fire();
+    const exitPrompt = !document.getElementById('exitModal').hidden;
+    const e = state.view;
+    closeExitConfirm();
+    return { c, viewA, d, exitPrompt, e };
   })()`);
 
   if (
     escCheck &&
-    escCheck.a === 'dashboard' &&
-    escCheck.b === 'dashboard' &&
     escCheck.c === null &&
-    escCheck.d === 'settings'
+    escCheck.viewA === 'reports' &&
+    escCheck.d === 'dashboard' &&
+    escCheck.exitPrompt === true &&
+    escCheck.e === 'dashboard'
   ) {
     console.log('REPORTS_DBG esc=' + JSON.stringify(escCheck));
   } else {
@@ -357,6 +423,8 @@ app.whenReady().then(async () => {
       report.totals.trialSum +
       ' net=' +
       report.totals.net +
+      ' cashflow=' +
+      report.totals.netCash +
       ' plOpen=' +
       report.totals.plOpen +
       ' bs=' +

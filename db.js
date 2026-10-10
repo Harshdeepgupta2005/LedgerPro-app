@@ -3,7 +3,7 @@ const fs = require('fs');
 const { app } = require('electron');
 const Database = require('better-sqlite3');
 
-const SCHEMA_VERSION = '2';
+const SCHEMA_VERSION = '4';
 const BACKUP_KEEP = 5;
 
 let db = null;
@@ -77,6 +77,17 @@ const MIGRATIONS = {
       db.exec("ALTER TABLE vouchers ADD COLUMN created_at TEXT NOT NULL DEFAULT ''");
     }
   },
+  3: function migrateTo3() {
+    if (!hasColumn('accounts', 'category')) {
+      db.exec("ALTER TABLE accounts ADD COLUMN category TEXT NOT NULL DEFAULT ''");
+    }
+  },
+  4: function migrateTo4() {
+    if (!hasColumn('accounts', 'liquid')) {
+      db.exec('ALTER TABLE accounts ADD COLUMN liquid INTEGER NOT NULL DEFAULT 0');
+      db.exec("UPDATE accounts SET liquid = 1 WHERE type IN ('Cash','Bank')");
+    }
+  },
 };
 
 function migrate() {
@@ -110,6 +121,8 @@ function open() {
       name TEXT NOT NULL,
       group_name TEXT NOT NULL,
       type TEXT NOT NULL DEFAULT 'Other',
+      category TEXT NOT NULL DEFAULT '',
+      liquid INTEGER NOT NULL DEFAULT 0,
       opening REAL NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS vouchers (
@@ -139,7 +152,7 @@ function load() {
   if (!db) throw new Error('Database not open');
   const accounts = db
     .prepare(
-      `SELECT id, name, group_name, type, opening FROM accounts
+      `SELECT id, name, group_name, type, category, liquid, opening FROM accounts
        ORDER BY CASE group_name
          WHEN 'Assets' THEN 1
          WHEN 'Liabilities' THEN 2
@@ -149,7 +162,15 @@ function load() {
        END, name COLLATE NOCASE ASC`
     )
     .all()
-    .map((r) => ({ id: r.id, name: r.name, group: r.group_name, type: r.type, opening: r.opening }));
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      group: r.group_name,
+      type: r.type,
+      category: r.category || '',
+      liquid: r.liquid === 1,
+      opening: r.opening,
+    }));
   const vouchers = db
     .prepare(
       'SELECT id, no, date, type, dr, cr, amount, narration, created_at FROM vouchers ORDER BY date, id'
@@ -189,9 +210,9 @@ function save(doc) {
   if (!accounts || !vouchers) throw new Error('Invalid document: accounts/vouchers must be arrays');
 
   const upsertAccount = db.prepare(
-    `INSERT INTO accounts (id, name, group_name, type, opening) VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO accounts (id, name, group_name, type, category, liquid, opening) VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET name = excluded.name, group_name = excluded.group_name,
-       type = excluded.type, opening = excluded.opening`
+       type = excluded.type, category = excluded.category, liquid = excluded.liquid, opening = excluded.opening`
   );
   const upsertVoucher = db.prepare(
     `INSERT INTO vouchers (id, no, date, type, dr, cr, amount, narration, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -203,16 +224,11 @@ function save(doc) {
   const seqs = doc.seqs && typeof doc.seqs === 'object' ? doc.seqs : {};
 
   const deleteNotIn = (table, ids) => {
-    if (ids.length === 0) {
-      db.prepare(`DELETE FROM ${table}`).run();
-      return;
-    }
-    const chunks = [];
-    for (let i = 0; i < ids.length; i += 500) chunks.push(ids.slice(i, i + 500));
-    for (const chunk of chunks) {
-      const placeholders = chunk.map(() => '?').join(',');
-      db.prepare(`DELETE FROM ${table} WHERE id NOT IN (${placeholders})`).run(...chunk);
-    }
+    db.exec('CREATE TEMP TABLE IF NOT EXISTS _keep_ids (id TEXT PRIMARY KEY)');
+    db.exec('DELETE FROM _keep_ids');
+    const keep = db.prepare('INSERT OR IGNORE INTO _keep_ids (id) VALUES (?)');
+    for (const id of ids) keep.run(id);
+    db.prepare(`DELETE FROM ${table} WHERE id NOT IN (SELECT id FROM _keep_ids)`).run();
   };
 
   db.transaction(() => {
@@ -222,6 +238,8 @@ function save(doc) {
         String(a.name),
         String(a.group || 'Assets'),
         String(a.type || 'Other'),
+        String(a.category || ''),
+        Number(a.liquid ? 1 : 0) || 0,
         Number(a.opening) || 0
       );
     }
@@ -267,8 +285,21 @@ function close() {
 
 function exportBackup(target) {
   if (!db) throw new Error('Database not open');
-  db.prepare('VACUUM INTO ?').run(String(target));
-  return { ok: true, path: String(target) };
+  const dest = String(target);
+  const tmp = `${dest}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    db.prepare('VACUUM INTO ?').run(tmp);
+    fs.rmSync(dest, { force: true });
+    fs.renameSync(tmp, dest);
+  } catch (e) {
+    try {
+      fs.rmSync(tmp, { force: true });
+    } catch (cleanupErr) {
+      /* ignore */
+    }
+    throw e;
+  }
+  return { ok: true, path: dest };
 }
 
 function validateDbFile(file) {

@@ -11,6 +11,70 @@ function isDebitNormal(a) {
   return a != null && (a.group === 'Assets' || a.group === 'Expenses');
 }
 
+// Types whose balance is immediately cash-like (used to decide liquidity, and the
+// cash-only ledgers on Payment/Receipt/Contra vouchers).
+const LIQUID_TYPES = ['Cash', 'Bank'];
+
+function isLiquidType(type) {
+  return LIQUID_TYPES.includes(type);
+}
+
+// Schedule III (Companies Act, 2013) style classification. Every account belongs
+// to one group (the statement side) and one category (the Schedule III head).
+const REPORT_GROUPS = ['Assets', 'Liabilities', 'Income', 'Expenses'];
+
+const CATEGORIES = {
+  Assets: ['Non-Current Assets', 'Current Assets'],
+  Liabilities: ['Equity', 'Non-Current Liabilities', 'Current Liabilities'],
+  Income: ['Revenue from Operations', 'Other Income'],
+  Expenses: [
+    'Cost of Materials & Purchases',
+    'Employee Benefits',
+    'Finance Costs',
+    'Depreciation & Amortisation',
+    'Other Expenses',
+  ],
+};
+
+function categoriesFor(group) {
+  return CATEGORIES[group] ? CATEGORIES[group].slice() : ['Other'];
+}
+
+// Best-guess classification for accounts that predate the Category field.
+function defaultCategory(group, type) {
+  if (group === 'Assets') {
+    return type === 'Cash' || type === 'Bank' || type === 'Receivable'
+      ? 'Current Assets'
+      : 'Non-Current Assets';
+  }
+  if (group === 'Liabilities') {
+    return type === 'Payable' ? 'Current Liabilities' : 'Equity';
+  }
+  if (group === 'Income') return 'Revenue from Operations';
+  if (group === 'Expenses') return 'Other Expenses';
+  return 'Other';
+}
+
+function categoryRank(group, category) {
+  const list = categoriesFor(group);
+  const i = list.indexOf(category);
+  return i === -1 ? list.length : i;
+}
+
+function normalizeAccount(a) {
+  if (!a || typeof a !== 'object') return a;
+  if (!a.category) a.category = defaultCategory(a.group, a.type);
+  if (typeof a.liquid !== 'boolean') a.liquid = isLiquidType(a.type);
+  return a;
+}
+
+function prevDate(dateStr) {
+  const d = new Date(`${String(dateStr)}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 function voucherNumberPrefix(type) {
   return { Payment: 'PAY', Receipt: 'RCP', Contra: 'CNTR', Journal: 'JRN' }[type] || 'VCH';
 }
@@ -41,6 +105,86 @@ function accountBalance(vouchers, account, opts = {}) {
   const debitNormal = isDebitNormal(account);
   const opening = Number(account.opening) || 0;
   return opening + (debitNormal ? dr - cr : cr - dr);
+}
+
+// Indirect-method cash flow statement (AS 3 / Ind AS 7). Cash and cash
+// equivalents are Assets typed Cash/Bank. Every other account's period movement
+// is mapped to operating, investing or financing from its category, so the
+// three activity totals always reconcile to the change in cash.
+function cashFlowStatement(accounts, vouchers, range) {
+  range = range || {};
+  const from = range.from || null;
+  const to = range.to || null;
+  const before = from ? prevDate(from) : null;
+
+  const beginning = (a) => (before ? accountBalance(vouchers, a, { to: before }) : Number(a.opening) || 0);
+  const ending = (a) => accountBalance(vouchers, a, to ? { to } : {});
+  const change = (a) => ending(a) - beginning(a);
+  const isCash = (a) => a.group === 'Assets' && (a.type === 'Cash' || a.type === 'Bank');
+  const catOf = (a) => a.category || defaultCategory(a.group, a.type);
+
+  let income = 0;
+  let expense = 0;
+  for (const a of accounts) {
+    let dr = 0;
+    let cr = 0;
+    for (const v of vouchers) {
+      if (from && v.date < from) continue;
+      if (to && v.date > to) continue;
+      if (v.dr === a.id) dr += v.amount;
+      if (v.cr === a.id) cr += v.amount;
+    }
+    if (a.group === 'Income') income += cr - dr;
+    else if (a.group === 'Expenses') expense += dr - cr;
+  }
+  const netProfit = income - expense;
+
+  const keep = (amount) => Math.abs(amount) > 1e-9;
+  const operating = [];
+  const investing = [];
+  const financing = [];
+  let cfo = netProfit;
+  for (const a of accounts) {
+    if (a.group === 'Assets') {
+      if (isCash(a)) continue;
+      const amount = -change(a);
+      if (!keep(amount)) continue;
+      if (catOf(a) === 'Current Assets') {
+        cfo += amount;
+        operating.push({ name: a.name, amount });
+      } else {
+        investing.push({ name: a.name, amount });
+      }
+    } else if (a.group === 'Liabilities') {
+      const amount = change(a);
+      if (!keep(amount)) continue;
+      if (catOf(a) === 'Current Liabilities') {
+        cfo += amount;
+        operating.push({ name: a.name, amount });
+      } else {
+        financing.push({ name: a.name, amount });
+      }
+    }
+  }
+
+  const cfi = investing.reduce((s, l) => s + l.amount, 0);
+  const cff = financing.reduce((s, l) => s + l.amount, 0);
+  let cashChange = 0;
+  for (const a of accounts) if (isCash(a)) cashChange += change(a);
+  const netCash = cfo + cfi + cff;
+
+  return {
+    netProfit,
+    operating,
+    investing,
+    financing,
+    cfo,
+    cfi,
+    cff,
+    netCash,
+    cashChange,
+    balanced: Math.abs(netCash - cashChange) < 0.005,
+  };
 }
 
 function monthKey(dateStr) {
@@ -112,6 +256,15 @@ if (typeof module !== 'undefined' && module.exports) {
     voucherNumberPrefix,
     nextVoucherNo,
     accountBalance,
+    REPORT_GROUPS,
+    CATEGORIES,
+    categoriesFor,
+    defaultCategory,
+    categoryRank,
+    normalizeAccount,
+    prevDate,
+    isLiquidType,
+    cashFlowStatement,
     monthKey,
     thisMonthKey,
     numToWords,

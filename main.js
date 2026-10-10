@@ -68,6 +68,10 @@ ipcMain.on('app:version', (event) => {
   event.returnValue = app.getVersion();
 });
 
+ipcMain.on('app:quit', () => {
+  app.quit();
+});
+
 // Windows-only: match the native window-control overlay to the active theme.
 ipcMain.on('win:overlay', (event, opts) => {
   if (!isWin || !opts) return;
@@ -149,7 +153,7 @@ ipcMain.handle('export:pdf', (event, { defaultName }) =>
 function backStamp() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
 ipcMain.handle('data:backup', async (event) => {

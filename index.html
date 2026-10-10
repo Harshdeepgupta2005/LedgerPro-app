@@ -8,7 +8,7 @@
     />
     <title>LedgerPro</title>
     <link rel="icon" type="image/png" href="assets/icon-256.png" />
-    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/modern.css" />
   </head>
   <body>
     <div class="app">
@@ -24,10 +24,10 @@
         <nav class="nav" id="nav">
           <button class="nav-item active" data-view="dashboard" data-nav-key="d" title="Dashboard (D)">
             <svg viewBox="0 0 24 24">
-              <rect x="3" y="3" width="7" height="7" rx="1.5" />
-              <rect x="14" y="3" width="7" height="7" rx="1.5" />
-              <rect x="3" y="14" width="7" height="7" rx="1.5" />
-              <rect x="14" y="14" width="7" height="7" rx="1.5" />
+              <rect x="3" y="3" width="7" height="7" rx="1.4" />
+              <rect x="14" y="3" width="7" height="7" rx="1.4" />
+              <rect x="3" y="14" width="7" height="7" rx="1.4" />
+              <rect x="14" y="14" width="7" height="7" rx="1.4" />
             </svg>
             <span><span class="nav-key">D</span>ashboard</span>
           </button>
@@ -277,10 +277,12 @@
                 <table class="table" id="accountTable">
                   <thead>
                     <tr>
-                      <th scope="col">Account</th>
-                      <th scope="col">Group</th>
-                      <th scope="col">Type</th>
-                      <th class="num" scope="col">Balance</th>
+                      <th scope="col" class="sortable" data-sort="name" title="Sort by account">Account</th>
+                      <th scope="col" class="sortable" data-sort="group" title="Sort by group">Group</th>
+                      <th scope="col" class="sortable" data-sort="type" title="Sort by type">Type</th>
+                      <th class="num sortable" scope="col" data-sort="balance" title="Sort by balance">
+                        Balance
+                      </th>
                       <th scope="col"></th>
                     </tr>
                   </thead>
@@ -366,6 +368,17 @@
                   ></span>
                   <strong>Balance Sheet</strong>
                   <span class="muted">Assets, liabilities and capital as of today</span>
+                </button>
+                <button class="report-card" data-report="cashflow">
+                  <span class="report-card-icon tint-amber"
+                    ><svg viewBox="0 0 24 24">
+                      <path d="M17 2l4 4-4 4" />
+                      <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+                      <path d="M7 22l-4-4 4-4" />
+                      <path d="M21 13v1a4 4 0 0 1-4 4H3" /></svg
+                  ></span>
+                  <strong>Cash Flow Statement</strong>
+                  <span class="muted">Operating, investing and financing flows</span>
                 </button>
               </div>
             </div>
@@ -490,7 +503,9 @@
               aria-label="Export this ledger as CSV"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 15V3M7.5 10.5 12 15l4.5-4.5M5 20h14" />
+                <path d="M12 3v12" />
+                <path d="M7 11l5 5 5-5" />
+                <path d="M5 21h14" />
               </svg>
               <span>Export CSV</span>
             </button>
@@ -590,8 +605,26 @@
                 <option>Payable</option>
                 <option>Other</option>
               </select>
+              <p class="muted hint-small">
+                Cash-&amp;-bank types are liquid by default; other types (e.g. a rent deposit) are not. The
+                question below overrides this for current assets.
+              </p>
             </label>
           </div>
+          <label class="field" id="liquidField" hidden>
+            <span>Is this a liquid current asset?</span>
+            <select name="liquid">
+              <option value="1">Yes — count toward liquidity</option>
+              <option value="0">No — not readily convertible to cash</option>
+            </select>
+            <p class="muted hint-small">
+              Liquid current assets (cash-like) are counted in the dashboard's Current Liquidity.
+            </p>
+          </label>
+          <label class="field">
+            <span>Category <span class="muted">(Schedule III head)</span></span>
+            <select name="category"></select>
+          </label>
           <label class="field" id="openingField">
             <span>Opening balance (₹)</span>
             <input type="number" name="opening" step="0.01" placeholder="0.00" />
@@ -640,7 +673,7 @@
         <form id="periodForm" class="modal-body">
           <p class="muted">
             Reports cover transactions between these dates. Trial Balance and Balance Sheet show balances as
-            of the end date.
+            of the end date; Profit &amp; Loss and Cash Flow cover the period.
           </p>
           <div class="form-grid">
             <label class="field">
@@ -659,6 +692,23 @@
             <button type="submit" class="btn btn-primary" id="periodSaveBtn">Apply Period</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="exitModal" hidden>
+      <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="exitModalTitle">
+        <div class="modal-head">
+          <h2 id="exitModalTitle">Shut down LedgerPro?</h2>
+        </div>
+        <div class="modal-body">
+          <p class="muted">
+            All books are saved automatically. Press <strong>Y</strong> to exit or <strong>N</strong> to stay.
+          </p>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="exitNoBtn">Stay (N)</button>
+            <button type="button" class="btn btn-primary" id="exitYesBtn">Exit (Y)</button>
+          </div>
+        </div>
       </div>
     </div>
 

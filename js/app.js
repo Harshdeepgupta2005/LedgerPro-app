@@ -23,13 +23,6 @@ function syncTitleBarOverlay(resolved) {
 
 const NAV_KEYS = { d: 'dashboard', v: 'vouchers', a: 'accounts', g: 'register', r: 'reports', s: 'settings' };
 
-const viewHistory = [];
-
-function goBackView() {
-  const target = viewHistory.pop() || 'dashboard';
-  showView(target, { record: false });
-}
-
 function applyTheme(choice) {
   const resolved =
     choice === 'system'
@@ -68,12 +61,11 @@ function initTheme() {
   });
 }
 
-function showView(name, { record = true } = {}) {
+function showView(name) {
   if (!PAGE_META[name]) return;
-  if (record && state.view && state.view !== name && viewHistory[viewHistory.length - 1] !== state.view) {
-    viewHistory.push(state.view);
-  }
   state.view = name;
+
+  $('#exitModal').hidden = true;
 
   $$('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
   $$('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + name));
@@ -121,8 +113,7 @@ function goToEntry() {
 function openDateModal() {
   $('#bookDateInput').value = getBookDate();
   $('#dateModalError').hidden = true;
-  $('#dateModal').hidden = false;
-  setTimeout(() => $('#bookDateInput').focus(), 30);
+  openModal('dateModal');
 }
 
 function openPeriodModal() {
@@ -130,8 +121,20 @@ function openPeriodModal() {
   $('#periodFromInput').value = p ? p.from : '';
   $('#periodToInput').value = p ? p.to : '';
   $('#periodModalError').hidden = true;
-  $('#periodModal').hidden = false;
-  setTimeout(() => $('#periodFromInput').focus(), 30);
+  openModal('periodModal');
+}
+
+function openExitConfirm() {
+  openModal('exitModal');
+}
+
+function closeExitConfirm() {
+  closeModal($('#exitModal'));
+}
+
+function quitApp() {
+  if (window.ledger && typeof window.ledger.quit === 'function') window.ledger.quit();
+  else window.close();
 }
 
 function ensureSelectOption(select, value) {
@@ -144,6 +147,34 @@ function ensureSelectOption(select, value) {
     select.appendChild(opt);
   }
   select.value = value;
+}
+
+function populateCategoryOptions(group, selected, allowExtra) {
+  const select = $('#accountForm').category;
+  const list = categoriesFor(group);
+  select.innerHTML = '';
+  for (const c of list) {
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = c;
+    select.appendChild(opt);
+  }
+  if (allowExtra && selected && !list.includes(selected)) {
+    const opt = document.createElement('option');
+    opt.value = selected;
+    opt.textContent = selected;
+    select.appendChild(opt);
+  }
+  if (selected && list.includes(selected)) select.value = selected;
+}
+
+function syncLiquidField() {
+  const f = $('#accountForm');
+  const isCurrent = f.group.value === 'Assets' && f.category.value === 'Current Assets';
+  $('#liquidField').hidden = !isCurrent;
+  if (isCurrent && f.liquid.value === '') {
+    f.liquid.value = isLiquidType(f.type.value) ? '1' : '0';
+  }
 }
 
 function openAccountModal(id) {
@@ -159,17 +190,22 @@ function openAccountModal(id) {
     form.name.value = a.name;
     ensureSelectOption(form.group, a.group);
     ensureSelectOption(form.type, a.type);
+    populateCategoryOptions(a.group, a.category || defaultCategory(a.group, a.type), true);
     form.opening.value = Number(a.opening) || 0;
+    form.liquid.value = (typeof a.liquid === 'boolean' ? a.liquid : isLiquidType(a.type)) ? '1' : '0';
     $('#accountModalTitle').textContent = 'Edit Account';
     $('#accountSaveBtn').textContent = 'Update Account';
     $('#openingField').hidden = false;
   } else {
     form.id.value = '';
+    populateCategoryOptions(form.group.value, defaultCategory(form.group.value, form.type.value), false);
+    form.liquid.value = isLiquidType(form.type.value) ? '1' : '0';
     $('#accountModalTitle').textContent = 'Add Account';
     $('#accountSaveBtn').textContent = 'Save Account';
     $('#openingField').hidden = false;
   }
 
+  syncLiquidField();
   openModal('accountModal');
 }
 
@@ -273,7 +309,12 @@ function submitEntry() {
 function wireEvents() {
   $('#nav').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-view]');
-    if (btn) showView(btn.dataset.view);
+    if (btn) {
+      showView(btn.dataset.view);
+      // Mouse clicks leave the button focused, which then shows a stale focus
+      // ring once the user switches sections with a keyboard shortcut.
+      if (e.detail > 0) btn.blur();
+    }
   });
 
   $('#reportCards').addEventListener('click', (e) => {
@@ -281,6 +322,15 @@ function wireEvents() {
     if (card) openReport(card.dataset.report);
   });
   $('#reportBack').addEventListener('click', closeReport);
+
+  $('#accountTable thead').addEventListener('click', (e) => {
+    const th = e.target.closest('th[data-sort]');
+    if (!th) return;
+    const key = th.dataset.sort;
+    if (state.accountSort.key === key) state.accountSort.dir *= -1;
+    else state.accountSort = { key, dir: 1 };
+    renderCurrent();
+  });
 
   document.addEventListener('click', (e) => {
     const goto = e.target.closest('[data-goto]');
@@ -353,6 +403,8 @@ function wireEvents() {
     if (state.ledgerId) openAccountModal(state.ledgerId);
   });
   $('#ledgerNewEntry').addEventListener('click', goToEntry);
+  $('#exitYesBtn').addEventListener('click', quitApp);
+  $('#exitNoBtn').addEventListener('click', closeExitConfirm);
 
   $('#saveLedgerOpening').addEventListener('click', () => {
     const a = Store.account(state.ledgerId);
@@ -372,6 +424,15 @@ function wireEvents() {
       e.preventDefault();
       $('#searchInput').focus();
       $('#searchInput').select();
+      return;
+    }
+
+    if (!$('#exitModal').hidden) {
+      if (e.key === 'y' || e.key === 'Y') {
+        quitApp();
+      } else if (e.key === 'n' || e.key === 'N' || e.key === 'Escape') {
+        closeExitConfirm();
+      }
       return;
     }
 
@@ -403,7 +464,9 @@ function wireEvents() {
 
     if (e.key === 'Escape') {
       if (modalOpen) {
-        $$('.modal-overlay').forEach((o) => (o.hidden = true));
+        $$('.modal-overlay').forEach((o) => {
+          if (!o.hidden) closeModal(o);
+        });
         return;
       }
       if (!$('#ledgerOverlay').hidden) {
@@ -430,10 +493,18 @@ function wireEvents() {
         resetEntryForm();
         return;
       }
-      if (!typing) {
+      if (typing) {
+        // An input has (auto)focus — drop it first so the sidebar letter
+        // shortcuts work again; don't navigate on this press.
         e.preventDefault();
-        goBackView();
+        document.activeElement.blur();
+        return;
       }
+      e.preventDefault();
+      // Escape always returns straight to the dashboard (never one-by-one),
+      // and on the dashboard it asks to shut the app down.
+      if (state.view === 'dashboard') openExitConfirm();
+      else showView('dashboard', { record: false });
       return;
     }
 
@@ -498,6 +569,8 @@ function wireEvents() {
         if (!$('#ledgerOverlay').hidden) return;
         const view = NAV_KEYS[e.key.toLowerCase()];
         if (view) {
+          const ae = document.activeElement;
+          if (ae && typeof ae.closest === 'function' && ae.closest('.nav-item')) ae.blur();
           showView(view);
           return;
         }
@@ -712,6 +785,22 @@ function wireEvents() {
     focusFirstLedger();
   });
 
+  $('#accountForm').group.addEventListener('change', () => {
+    const f = $('#accountForm');
+    populateCategoryOptions(f.group.value, defaultCategory(f.group.value, f.type.value), false);
+    f.liquid.value = isLiquidType(f.type.value) ? '1' : '0';
+    syncLiquidField();
+  });
+
+  $('#accountForm').category.addEventListener('change', syncLiquidField);
+
+  $('#accountForm').type.addEventListener('change', () => {
+    const f = $('#accountForm');
+    populateCategoryOptions(f.group.value, defaultCategory(f.group.value, f.type.value), false);
+    f.liquid.value = isLiquidType(f.type.value) ? '1' : '0';
+    syncLiquidField();
+  });
+
   $('#accountForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const f = e.target;
@@ -720,6 +809,11 @@ function wireEvents() {
     const id = f.id.value;
 
     err.hidden = true;
+    if (!name) {
+      err.textContent = 'Enter an account name.';
+      err.hidden = false;
+      return;
+    }
     if (Store.db.accounts.some((a) => a.name.toLowerCase() === name.toLowerCase() && a.id !== id)) {
       err.textContent = 'An account with this name already exists.';
       err.hidden = false;
@@ -731,6 +825,8 @@ function wireEvents() {
         name,
         group: f.group.value,
         type: f.type.value,
+        category: f.category.value || defaultCategory(f.group.value, f.type.value),
+        liquid: f.liquid.value === '1',
         opening: parseFloat(f.opening.value) || 0,
       });
       toast('Account updated');
@@ -740,6 +836,8 @@ function wireEvents() {
         name,
         group: f.group.value,
         type: f.type.value,
+        category: f.category.value || defaultCategory(f.group.value, f.type.value),
+        liquid: f.liquid.value === '1',
         opening: parseFloat(f.opening.value) || 0,
       });
       toast('Account created');

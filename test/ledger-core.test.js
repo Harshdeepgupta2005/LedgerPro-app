@@ -72,3 +72,85 @@ test('numToWords handles zero and paise', () => {
   assert.equal(core.numToWords(12500000.75), 'One Crore Twenty Five Lakh and Seventy Five Paise');
   assert.equal(core.numToWords(-45), 'Forty Five');
 });
+
+test('defaultCategory maps groups and types to Schedule III heads', () => {
+  assert.equal(core.defaultCategory('Assets', 'Cash'), 'Current Assets');
+  assert.equal(core.defaultCategory('Assets', 'Bank'), 'Current Assets');
+  assert.equal(core.defaultCategory('Assets', 'Receivable'), 'Current Assets');
+  assert.equal(core.defaultCategory('Assets', 'Other'), 'Non-Current Assets');
+  assert.equal(core.defaultCategory('Liabilities', 'Payable'), 'Current Liabilities');
+  assert.equal(core.defaultCategory('Liabilities', 'Other'), 'Equity');
+  assert.equal(core.defaultCategory('Income', 'Other'), 'Revenue from Operations');
+  assert.equal(core.defaultCategory('Expenses', 'Other'), 'Other Expenses');
+});
+
+test('normalizeAccount fills a missing category without clobbering one', () => {
+  const a = { id: 'a', group: 'Assets', type: 'Bank' };
+  core.normalizeAccount(a);
+  assert.equal(a.category, 'Current Assets');
+  assert.equal(a.liquid, true);
+  const b = { id: 'b', group: 'Assets', type: 'Bank', category: 'Non-Current Assets' };
+  core.normalizeAccount(b);
+  assert.equal(b.category, 'Non-Current Assets');
+  const c = { id: 'c', group: 'Assets', type: 'Other', liquid: false };
+  core.normalizeAccount(c);
+  assert.equal(c.liquid, false);
+  const d = { id: 'd', group: 'Assets', type: 'Other' };
+  core.normalizeAccount(d);
+  assert.equal(d.liquid, false);
+});
+
+test('prevDate rolls back across month and year boundaries', () => {
+  assert.equal(core.prevDate('2026-03-01'), '2026-02-28');
+  assert.equal(core.prevDate('2024-03-01'), '2024-02-29');
+  assert.equal(core.prevDate('2026-01-01'), '2025-12-31');
+});
+
+test('isLiquidType flags only cash-like types', () => {
+  assert.equal(core.isLiquidType('Cash'), true);
+  assert.equal(core.isLiquidType('Bank'), true);
+  assert.equal(core.isLiquidType('Receivable'), false);
+  assert.equal(core.isLiquidType('Payable'), false);
+  assert.equal(core.isLiquidType('Other'), false);
+  assert.equal(core.isLiquidType(undefined), false);
+});
+
+test('cashFlowStatement reconciles activities to the change in cash', () => {
+  const accounts = [
+    { id: 'cash', name: 'Cash', group: 'Assets', type: 'Cash', opening: 0 },
+    { id: 'bank', name: 'Bank', group: 'Assets', type: 'Bank', opening: 0 },
+    { id: 'ar', name: 'Debtors', group: 'Assets', type: 'Receivable', opening: 0 },
+    { id: 'capital', name: 'Capital', group: 'Liabilities', type: 'Other', opening: 0 },
+    { id: 'sales', name: 'Sales', group: 'Income', type: 'Other', opening: 0 },
+    { id: 'rent', name: 'Rent', group: 'Expenses', type: 'Other', opening: 0 },
+  ];
+  const vouchers = [
+    { dr: 'ar', cr: 'sales', amount: 500, date: '2026-01-02' },
+    { dr: 'cash', cr: 'ar', amount: 300, date: '2026-01-05' },
+    { dr: 'rent', cr: 'cash', amount: 100, date: '2026-01-08' },
+    { dr: 'bank', cr: 'capital', amount: 1000, date: '2026-01-10' },
+  ];
+  const cf = core.cashFlowStatement(accounts, vouchers, null);
+  assert.equal(cf.netProfit, 400);
+  assert.equal(cf.cfo, 200);
+  assert.equal(cf.cfi, 0);
+  assert.equal(cf.cff, 1000);
+  assert.equal(cf.netCash, 1200);
+  assert.equal(cf.cashChange, 1200);
+  assert.equal(cf.balanced, true);
+});
+
+test('cashFlowStatement honors a period range', () => {
+  const accounts = [
+    { id: 'cash', name: 'Cash', group: 'Assets', type: 'Cash', opening: 0 },
+    { id: 'sales', name: 'Sales', group: 'Income', type: 'Other', opening: 0 },
+  ];
+  const vouchers = [
+    { dr: 'cash', cr: 'sales', amount: 100, date: '2026-01-05' },
+    { dr: 'cash', cr: 'sales', amount: 250, date: '2026-02-05' },
+  ];
+  const cf = core.cashFlowStatement(accounts, vouchers, { from: '2026-02-01', to: '2026-02-28' });
+  assert.equal(cf.netProfit, 250);
+  assert.equal(cf.cashChange, 250);
+  assert.equal(cf.balanced, true);
+});

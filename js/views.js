@@ -7,6 +7,7 @@ const state = {
   view: 'dashboard',
   search: '',
   accountFilter: 'all',
+  accountSort: { key: 'name', dir: 1 },
   reportFilter: 'all',
   report: null,
   entryType: 'Payment',
@@ -59,8 +60,7 @@ function byDateDesc(a, b) {
   return byDateAsc(a, b) * -1;
 }
 
-const EDIT_ICON =
-  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+const EDIT_ICON = ICONS.pencil;
 
 function rowActionsHTML(kind, id) {
   const label = kind === 'account' ? 'account' : 'entry';
@@ -136,6 +136,13 @@ function renderDashboard() {
     .filter((a) => a.type === 'Cash' || a.type === 'Bank')
     .reduce((sum, a) => sum + Store.balanceOf(a.id), 0);
 
+  const currentLiquid = Store.db.accounts.reduce((sum, a) => {
+    const c = a.category || defaultCategory(a.group, a.type);
+    if (c === 'Current Assets' && isLiquid(a)) return sum + Store.balanceOf(a.id);
+    if (c === 'Current Liabilities') return sum - Store.balanceOf(a.id);
+    return sum;
+  }, 0);
+
   $('#statGrid').innerHTML = `
     <div class="stat">
       <div class="stat-top">
@@ -168,6 +175,14 @@ function renderDashboard() {
       </div>
       <div class="stat-value ${income - expense >= 0 ? 'text-green' : 'text-red'}" data-card-net="${income - expense}">${fmtCompact(income - expense)}</div>
       <div class="stat-sub">${statsSub}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-top">
+        <span class="stat-label">Current Liquidity</span>
+        <span class="stat-icon tint-cyan">${ICONS.droplet}</span>
+      </div>
+      <div class="stat-value ${currentLiquid < 0 ? 'text-red' : 'text-green'}" data-card-liquidity="${currentLiquid}">${fmtCompact(currentLiquid)}</div>
+      <div class="stat-sub">Liquid current assets minus current liabilities</div>
     </div>`;
 
   renderChart();
@@ -270,7 +285,9 @@ const TYPE_META = {
 };
 
 function isLiquid(a) {
-  return a.type === 'Cash' || a.type === 'Bank';
+  if (a && typeof a.liquid === 'boolean') return a.liquid;
+  if (a && typeof a.category === 'string' && a.category) return isLiquidType(a.type);
+  return isLiquidType(a.type);
 }
 
 function ledgerList(side) {
@@ -713,14 +730,39 @@ function renderVoucherEntry() {
 
 function filteredAccounts() {
   const q = state.search.toLowerCase();
-  return Store.db.accounts
+  const list = Store.db.accounts
     .filter((a) => state.accountFilter === 'all' || a.group === state.accountFilter)
     .filter((a) => !q || `${a.name} ${a.group} ${a.type}`.toLowerCase().includes(q));
+  const { key, dir } = state.accountSort;
+  const value = (a) => {
+    if (key === 'balance') return Store.balanceOf(a.id);
+    if (key === 'group') return a.group;
+    if (key === 'type') return a.type;
+    return a.name;
+  };
+  return list.sort((a, b) => {
+    const av = value(a);
+    const bv = value(b);
+    const cmp =
+      typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv), 'en', { sensitivity: 'base' });
+    if (cmp !== 0) return cmp * dir;
+    return a.name.localeCompare(b.name, 'en', { sensitivity: 'base' });
+  });
+}
+
+function renderSortIndicators() {
+  $$('#accountTable th[data-sort]').forEach((th) => {
+    const on = th.dataset.sort === state.accountSort.key;
+    th.classList.toggle('sort-asc', on && state.accountSort.dir === 1);
+    th.classList.toggle('sort-desc', on && state.accountSort.dir === -1);
+    th.setAttribute('aria-sort', on ? (state.accountSort.dir === 1 ? 'ascending' : 'descending') : 'none');
+  });
 }
 
 function renderAccounts() {
   const rows = filteredAccounts();
   clearRowNav();
+  renderSortIndicators();
   const tbody = $('#accountTable tbody');
   $('#accountEmpty').hidden = rows.length > 0;
   $('#accountTable').parentElement.hidden = rows.length === 0;
@@ -745,12 +787,22 @@ function renderAccounts() {
 /* ---------- Ledger drawer ---------- */
 
 function ledgerEntries(accountId) {
-  return Store.db.vouchers.filter((v) => v.dr === accountId || v.cr === accountId).sort(byDateAsc);
+  const p = state.period;
+  return Store.db.vouchers
+    .filter((v) => v.dr === accountId || v.cr === accountId)
+    .filter((v) => !p || ((!p.from || v.date >= p.from) && (!p.to || v.date <= p.to)))
+    .sort(byDateAsc);
+}
+
+function ledgerStartBalance(a) {
+  const p = state.period;
+  const before = p && p.from ? prevDate(p.from) : null;
+  return before ? Store.balanceOf(a.id, { to: before }) : Number(a.opening) || 0;
 }
 
 function ledgerRowsData(a) {
   const debitNormal = isDebitNormal(a);
-  let bal = Number(a.opening) || 0;
+  let bal = ledgerStartBalance(a);
   return ledgerEntries(a.id).map((v) => {
     const isDebit = v.dr === a.id;
     const other = Store.accountName(isDebit ? v.cr : v.dr);
@@ -765,7 +817,7 @@ function renderLedger() {
   clearRowNav();
 
   $('#ledgerTitle').textContent = a.name;
-  $('#ledgerSub').textContent = `${a.group} · ${a.type} account`;
+  $('#ledgerSub').textContent = `${a.group} · ${a.type} account · ${periodLabel()}`;
   $('#ledgerOpening').value = Number(a.opening) || 0;
 
   const data = ledgerRowsData(a);
@@ -785,7 +837,7 @@ function renderLedger() {
   $('#ledgerBody').innerHTML = rows.join('');
   $('#ledgerEmpty').hidden = rows.length > 0;
   $('#ledgerTable').hidden = rows.length === 0;
-  const closing = data.length ? data[data.length - 1].bal : Number(a.opening) || 0;
+  const closing = data.length ? data[data.length - 1].bal : ledgerStartBalance(a);
   $('#ledgerClosing').textContent = fmt(closing);
   $('#ledgerClosing').className = closing < 0 ? 'text-red' : 'text-green';
 }
@@ -822,10 +874,11 @@ function ledgerCSV(a) {
   };
   const round = (n) => Math.round(n * 100) / 100;
   const data = ledgerRowsData(a);
-  const opening = Number(a.opening) || 0;
+  const opening = ledgerStartBalance(a);
   const closing = data.length ? data[data.length - 1].bal : opening;
   const lines = [
     ['Ledger', `${a.name} (${a.group} · ${a.type})`].map(cell).join(','),
+    ...(state.period ? [['Period', periodLabel()].map(cell).join(',')] : []),
     ['Date', 'Voucher', 'Type', 'Particulars', 'Narration', 'Debit', 'Credit', 'Balance'].map(cell).join(','),
     ['', 'Opening balance', '', '', '', '', '', round(opening)].map(cell).join(','),
   ];
@@ -851,7 +904,7 @@ function ledgerCSV(a) {
 
 function fillPrintLedger(a) {
   const data = ledgerRowsData(a);
-  const opening = Number(a.opening) || 0;
+  const opening = ledgerStartBalance(a);
   const closing = data.length ? data[data.length - 1].bal : opening;
   $('#printLedger').innerHTML = `
     <div class="pl-head">
@@ -923,9 +976,10 @@ function exportLedgerPDF() {
 /* ---------- Reports ---------- */
 
 const REPORT_META = {
-  trial: { title: 'Trial Balance', sub: 'Debit and credit balances of all accounts' },
+  trial: { title: 'Trial Balance', sub: 'Debit and credit balances of every account' },
   pl: { title: 'Profit & Loss Statement', sub: 'Income and expenses for the period' },
-  balance: { title: 'Balance Sheet', sub: 'Assets, liabilities and capital as of today' },
+  balance: { title: 'Balance Sheet', sub: 'Assets, equity and liabilities as of the end date' },
+  cashflow: { title: 'Cash Flow Statement', sub: 'Operating, investing and financing flows' },
 };
 
 function renderReports() {
@@ -942,10 +996,32 @@ function renderReports() {
   $('#reportPicker').hidden = true;
   $('#reportCard').hidden = false;
   $('#reportTitle').textContent = meta.title;
-  $('#reportSub').textContent = `${meta.sub} · ${periodLabel()}`;
+  $('#reportSub').textContent = `${meta.sub} · Schedule III · ${periodLabel()}`;
   if (state.report === 'trial') renderTrialBalance();
   else if (state.report === 'pl') renderPLStatement();
   else if (state.report === 'balance') renderBalanceSheet();
+  else if (state.report === 'cashflow') renderCashFlowStatement();
+}
+
+// Accounts grouped by their Schedule III category, in statement order.
+function accountsByGroupAndCategory(group) {
+  const map = new Map();
+  for (const a of Store.db.accounts) {
+    if (a.group !== group) continue;
+    const c = a.category || defaultCategory(a.group, a.type);
+    if (!map.has(c)) map.set(c, []);
+    map.get(c).push(a);
+  }
+  const known = categoriesFor(group);
+  const ordered = known.filter((c) => map.has(c)).map((c) => ({ category: c, accounts: map.get(c) }));
+  for (const c of map.keys()) {
+    if (!known.includes(c)) ordered.push({ category: c, accounts: map.get(c) });
+  }
+  return ordered;
+}
+
+function typeBadge(type) {
+  return type ? badge(type) : '';
 }
 
 function openReport(name) {
@@ -963,24 +1039,56 @@ function renderTrialBalance() {
   const range = asOfRange();
   let totalDr = 0;
   let totalCr = 0;
-  const rows = Store.db.accounts
-    .map((a) => {
-      const bal = Store.balanceOf(a.id, range);
-      const debitNormal = isDebitNormal(a);
-      const isDebit = debitNormal ? bal >= 0 : bal < 0;
-      const amount = Math.abs(bal);
-      if (amount === 0) return null;
-      if (isDebit) totalDr += amount;
-      else totalCr += amount;
-      return `
-        <tr>
-          <td><span class="cell-title">${esc(a.name)}</span></td>
-          <td>${badge(a.group)}</td>
-          <td class="num">${isDebit ? `<strong>${fmt(amount)}</strong>` : '—'}</td>
-          <td class="num">${!isDebit ? `<strong>${fmt(amount)}</strong>` : '—'}</td>
+  let body = '';
+
+  for (const group of REPORT_GROUPS) {
+    const cats = accountsByGroupAndCategory(group);
+    let groupDr = 0;
+    let groupCr = 0;
+    let rows = '';
+    for (const { category, accounts } of cats) {
+      let catDr = 0;
+      let catCr = 0;
+      let accRows = '';
+      for (const a of accounts) {
+        const bal = Store.balanceOf(a.id, range);
+        if (bal === 0) continue;
+        const isDebit = isDebitNormal(a) ? bal >= 0 : bal < 0;
+        const amount = Math.abs(bal);
+        if (isDebit) catDr += amount;
+        else catCr += amount;
+        accRows += `
+          <tr>
+            <td><span class="cell-title">${esc(a.name)}</span></td>
+            <td>${typeBadge(a.type)}</td>
+            <td class="num">${isDebit ? `<strong>${fmt(amount)}</strong>` : '—'}</td>
+            <td class="num">${!isDebit ? `<strong>${fmt(amount)}</strong>` : '—'}</td>
+          </tr>`;
+      }
+      if (!accRows) continue;
+      groupDr += catDr;
+      groupCr += catCr;
+      rows += `
+        <tr class="report-subhead"><td colspan="4">${esc(group)} · ${esc(category)}</td></tr>
+        ${accRows}
+        <tr class="report-subtotal">
+          <td colspan="2">Subtotal — ${esc(category)}</td>
+          <td class="num" data-cat-dr="${catDr}">${fmt(catDr)}</td>
+          <td class="num" data-cat-cr="${catCr}">${fmt(catCr)}</td>
         </tr>`;
-    })
-    .filter(Boolean);
+    }
+    if (!rows) continue;
+    totalDr += groupDr;
+    totalCr += groupCr;
+    body += `
+      <tr class="report-group"><td colspan="4">${esc(group)}</td></tr>
+      ${rows}
+      <tr class="report-subtotal report-group-total">
+        <td colspan="2">Total ${esc(group)}</td>
+        <td class="num">${fmt(groupDr)}</td>
+        <td class="num">${fmt(groupCr)}</td>
+      </tr>`;
+  }
 
   const offBy = Math.abs(totalDr - totalCr);
   const balanced = offBy < 0.005;
@@ -988,12 +1096,12 @@ function renderTrialBalance() {
     <div class="table-wrap">
       <table class="table">
         <thead>
-          <tr><th scope="col">Account</th><th scope="col">Group</th><th class="num" scope="col">Debit</th><th class="num" scope="col">Credit</th></tr>
+          <tr><th scope="col">Account</th><th scope="col">Type</th><th class="num" scope="col">Debit</th><th class="num" scope="col">Credit</th></tr>
         </thead>
-        <tbody>${rows.join('') || '<tr><td colspan="4" class="empty">No balances to show.</td></tr>'}</tbody>
+        <tbody>${body || '<tr><td colspan="4" class="empty">No balances to show.</td></tr>'}</tbody>
         <tfoot>
           <tr>
-            <td colspan="2">Totals</td>
+            <td colspan="2">Grand total</td>
             <td class="num" data-total-dr="${totalDr}">${fmt(totalDr)}</td>
             <td class="num" data-total-cr="${totalCr}">${fmt(totalCr)}</td>
           </tr>
@@ -1038,22 +1146,41 @@ function renderPLStatement() {
   const range = reportRange();
   const { income, expense, net, flows } = plFigures(range);
 
-  const sectionRows = (title, list) => {
-    const rows = list
+  const lineBalance = (a) => {
+    const f = flows[a.id] || { dr: 0, cr: 0 };
+    return a.group === 'Income' ? f.cr - f.dr : f.dr - f.cr;
+  };
+
+  const categoryBlock = (category, accounts) => {
+    let subtotal = 0;
+    const rows = accounts
       .map((a) => {
-        const f = flows[a.id] || { dr: 0, cr: 0 };
-        const bal = a.group === 'Income' ? f.cr - f.dr : f.dr - f.cr;
-        if (bal === 0) return null;
+        const bal = lineBalance(a);
+        if (bal === 0) return '';
+        subtotal += bal;
         return `
           <tr>
-            <td class="pl-item"><span class="cell-title">${esc(a.name)}</span></td>
+            <td class="pl-item"><span class="cell-title">${esc(a.name)}</span>${typeBadge(a.type)}</td>
             <td class="num">${bal < 0 ? `<strong class="text-red">${fmt(bal)}</strong>` : fmt(bal)}</td>
           </tr>`;
       })
-      .filter(Boolean)
       .join('');
-    return `<tr class="report-section"><td colspan="2">${title}</td></tr>${rows}`;
+    if (!rows) return '';
+    return `
+      <tr class="report-subhead"><td colspan="2">${esc(category)}</td></tr>
+      ${rows}
+      <tr class="report-subtotal">
+        <td>Subtotal — ${esc(category)}</td>
+        <td class="num" data-cat-total="${subtotal}">${fmt(subtotal)}</td>
+      </tr>`;
   };
+
+  const incomeRows = accountsByGroupAndCategory('Income')
+    .map(({ category, accounts }) => categoryBlock(category, accounts))
+    .join('');
+  const expenseRows = accountsByGroupAndCategory('Expenses')
+    .map(({ category, accounts }) => categoryBlock(category, accounts))
+    .join('');
 
   $('#reportBody').innerHTML = `
     <div class="table-wrap">
@@ -1062,25 +1189,21 @@ function renderPLStatement() {
           <tr><th scope="col">Particulars</th><th class="num" scope="col">Amount</th></tr>
         </thead>
         <tbody>
-          ${sectionRows(
-            'Income',
-            Store.db.accounts.filter((a) => a.group === 'Income')
-          )}
+          <tr class="report-group"><td colspan="2">Income</td></tr>
+          ${incomeRows || '<tr><td colspan="2" class="empty">No income in this period.</td></tr>'}
           <tr class="report-total">
             <td>Total Income</td>
             <td class="num" data-total-income="${income}">${fmt(income)}</td>
           </tr>
-          ${sectionRows(
-            'Expenses',
-            Store.db.accounts.filter((a) => a.group === 'Expenses')
-          )}
+          <tr class="report-group"><td colspan="2">Expenses</td></tr>
+          ${expenseRows || '<tr><td colspan="2" class="empty">No expenses in this period.</td></tr>'}
           <tr class="report-total">
             <td>Total Expenses</td>
             <td class="num" data-total-expense="${expense}">${fmt(expense)}</td>
           </tr>
           <tr class="report-grand">
-            <td>${net >= 0 ? 'Net Profit' : 'Net Loss'} (Income − Expenses)</td>
-            <td class="num ${net < 0 ? 'text-red' : 'text-green'}" data-total-net="${net}">${fmt(Math.abs(net))}</td>
+            <td>${net >= 0 ? 'Profit' : 'Loss'} for the period (before tax)</td>
+            <td class="num ${net < 0 ? 'text-red' : 'text-green'}" data-total-net="${Math.abs(net)}">${fmt(Math.abs(net))}</td>
           </tr>
         </tbody>
       </table>
@@ -1099,66 +1222,137 @@ function renderBalanceSheet() {
     if (a.group === 'Income') retainedOpening += op;
     else if (a.group === 'Expenses') retainedOpening -= op;
   }
-  const capital = net + retainedOpening;
+  const retained = retainedOpening + net;
 
-  const panel = (title, group) => {
+  const panel = (group) => {
     let total = 0;
-    const rows = Store.db.accounts
-      .filter((a) => a.group === group)
-      .map((a) => {
-        const bal = Store.balanceOf(a.id, range);
-        if (bal === 0) return null;
-        total += bal;
+    const blocks = accountsByGroupAndCategory(group)
+      .map(({ category, accounts }) => {
+        let subtotal = 0;
+        const rows = accounts
+          .map((a) => {
+            const bal = Store.balanceOf(a.id, range);
+            if (bal === 0) return '';
+            subtotal += bal;
+            total += bal;
+            return `
+              <div class="bs-row">
+                <span>${esc(a.name)} <span class="muted">· ${esc(a.type)}</span></span>
+                <span class="num ${bal < 0 ? 'text-red' : ''}">${fmt(bal)}</span>
+              </div>`;
+          })
+          .join('');
+        if (!rows) return '';
         return `
-          <div class="bs-row">
-            <span>${esc(a.name)}</span>
-            <span class="num ${bal < 0 ? 'text-red' : ''}">${fmt(bal)}</span>
+          <div class="bs-cat">${esc(category)}</div>
+          ${rows}
+          <div class="bs-cat-total" data-cat-total="${subtotal}">
+            <span>Subtotal — ${esc(category)}</span>
+            <span class="num">${fmt(subtotal)}</span>
           </div>`;
       })
-      .filter(Boolean)
       .join('');
-    return { rows, total };
+    return { blocks, total };
   };
 
-  const assets = panel('Assets', 'Assets');
-  const liab = panel('Liabilities', 'Liabilities');
-  const liabilitiesTotal = liab.total + capital;
+  const liab = panel('Liabilities');
+  const assets = panel('Assets');
+  const liabilitiesTotal = liab.total + retained;
   const offBy = Math.abs(assets.total - liabilitiesTotal);
   const balanced = offBy < 0.005;
 
   $('#reportBody').innerHTML = `
     <div class="bs-grid">
       <div class="bs-panel">
-        <div class="bs-head">Liabilities &amp; Capital</div>
-        ${liab.rows || '<div class="bs-empty muted">No balances.</div>'}
-        ${
-          retainedOpening === 0
-            ? ''
-            : `
+        <div class="bs-head">Equity &amp; Liabilities</div>
+        ${liab.blocks || '<div class="bs-empty muted">No balances.</div>'}
         <div class="bs-note">
-          ${retainedOpening >= 0 ? 'Add' : 'Less'} opening balance of Income/Expense
-          <strong class="num" data-total-retained="${retainedOpening}">${fmt(Math.abs(retainedOpening))}</strong>
-        </div>`
-        }
-        <div class="bs-note">
-          ${net >= 0 ? 'Add' : 'Less'} Net ${net >= 0 ? 'Profit' : 'Loss'}
-          <strong class="num" data-total-net="${net}">${fmt(Math.abs(net))}</strong>
+          <span>${retained >= 0 ? 'Add' : 'Less'} Retained earnings (reserves &amp; surplus)</span>
+          <strong class="num" data-total-net="${Math.abs(net)}" data-total-retained="${retained}">${fmt(Math.abs(retained))}</strong>
         </div>
         <div class="bs-total">
-          <span>Total</span>
+          <span>Total Equity &amp; Liabilities</span>
           <span class="num" data-total-liabilities="${liabilitiesTotal}">${fmt(liabilitiesTotal)}</span>
         </div>
       </div>
       <div class="bs-panel">
         <div class="bs-head">Assets</div>
-        ${assets.rows || '<div class="bs-empty muted">No balances.</div>'}
+        ${assets.blocks || '<div class="bs-empty muted">No balances.</div>'}
         <div class="bs-total">
-          <span>Total</span>
+          <span>Total Assets</span>
           <span class="num" data-total-assets="${assets.total}">${fmt(assets.total)}</span>
         </div>
       </div>
     </div>
     ${balanced ? '' : `<div class="off-balance">Out of balance by ${fmt(offBy)} — check opening balances.</div>`}`;
+}
+
+function renderCashFlowStatement() {
+  const range = reportRange();
+  const from = range ? range.from : null;
+  const to = range ? range.to : null;
+  const cf = cashFlowStatement(Store.db.accounts, Store.db.vouchers, range);
+
+  const isCash = (a) => a.group === 'Assets' && (a.type === 'Cash' || a.type === 'Bank');
+  const cashAccounts = Store.db.accounts.filter(isCash);
+  const openingCash = from
+    ? cashAccounts.reduce((s, a) => s + Store.balanceOf(a.id, { to: prevDate(from) }), 0)
+    : cashAccounts.reduce((s, a) => s + (Number(a.opening) || 0), 0);
+  const closingCash = cashAccounts.reduce((s, a) => s + Store.balanceOf(a.id, to ? { to } : {}), 0);
+
+  const block = (title, lines, total, attr) => {
+    const rows = lines.length
+      ? lines
+          .map(
+            (l) =>
+              `<tr><td class="pl-item">${esc(l.name)}</td><td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td></tr>`
+          )
+          .join('')
+      : '<tr><td colspan="2" class="empty">No movements in this section.</td></tr>';
+    return `
+      <tr class="report-group"><td colspan="2">${esc(title)}</td></tr>
+      ${rows}
+      <tr class="report-total">
+        <td>Net cash from ${esc(title.replace(/^[A-C]\.\s*/, ''))}</td>
+        <td class="num" ${attr}="${total}">${fmt(total)}</td>
+      </tr>`;
+  };
+
+  const operating = [{ name: 'Net profit for the period', amount: cf.netProfit }].concat(cf.operating);
+
+  $('#reportBody').innerHTML = `
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr><th scope="col">Particulars</th><th class="num" scope="col">Amount</th></tr>
+        </thead>
+        <tbody>
+          ${block('A. Operating activities', operating, cf.cfo, 'data-total-cfo')}
+          ${block('B. Investing activities', cf.investing, cf.cfi, 'data-total-cfi')}
+          ${block('C. Financing activities', cf.financing, cf.cff, 'data-total-cff')}
+          <tr class="report-grand">
+            <td>Net increase / (decrease) in cash</td>
+            <td class="num" data-total-netcash="${cf.netCash}">${fmt(cf.netCash)}</td>
+          </tr>
+          <tr class="report-total">
+            <td>Cash &amp; cash equivalents — opening</td>
+            <td class="num" data-total-cash-open="${openingCash}">${fmt(openingCash)}</td>
+          </tr>
+          <tr class="report-grand">
+            <td>Cash &amp; cash equivalents — closing</td>
+            <td class="num" data-total-cash-close="${closingCash}">${fmt(closingCash)}</td>
+          </tr>
+          ${
+            cf.balanced
+              ? ''
+              : `
+          <tr class="off-balance">
+            <td colspan="2">Cash movement does not reconcile by ${fmt(Math.abs(cf.netCash - cf.cashChange))}.</td>
+          </tr>`
+          }
+        </tbody>
+      </table>
+    </div>`;
 }
 
 function filteredRegister() {
