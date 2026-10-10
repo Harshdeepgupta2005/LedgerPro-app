@@ -2,6 +2,31 @@
 
 All notable changes to LedgerPro are documented here. Semantic versioning.
 
+## [1.6.0] - 2026-10-10
+
+### Added
+
+- **Current liquidity on the dashboard**: a fifth stat card (droplet icon)
+  showing liquid current assets minus current liabilities
+- **Per-account liquidity flag**: accounts can be marked liquid explicitly;
+  Cash and Bank default to liquid, and the dashboard liquidity figure uses the
+  flag (schema upgraded to v4 with an automatic backfill migration)
+- Sortable Accounts columns (name, group, type, amount) with a stable
+  name tie-break and clearer sort indicators
+- `Escape` clears the voucher entry autofocus on first press so the sidebar
+  letter shortcuts work again, and otherwise returns straight to the dashboard
+  (previously it unwound view history one-by-one); a second press on the
+  dashboard opens the exit confirmation
+
+### Changed
+
+- **New modern theme is now the only stylesheet** (`css/modern.css`), replacing
+  `css/styles.css`: refreshed palette, Inter typeface, larger radii, gradient
+  accents, frosted-glass top bar, glossier chart bars and card styling
+- The ledger drawer now uses the global reporting period instead of its own
+  from/to controls (the per-drawer period UI was removed)
+- Account modal category now defaults from the selected account type
+
 ## [1.5.5] - 2026-10-09
 
 ### Added
