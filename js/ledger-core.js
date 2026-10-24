@@ -19,6 +19,15 @@ function isLiquidType(type) {
   return LIQUID_TYPES.includes(type);
 }
 
+// Authoritative liquidity test: the explicit per-account flag wins, otherwise
+// fall back to the account type. Shared by the dashboard, cash-flow statement
+// and the cash-only ledger pickers so they can never disagree.
+function isLiquidAccount(a) {
+  if (!a || typeof a !== 'object') return false;
+  if (typeof a.liquid === 'boolean') return a.liquid;
+  return isLiquidType(a.type);
+}
+
 // Schedule III (Companies Act, 2013) style classification. Every account belongs
 // to one group (the statement side) and one category (the Schedule III head).
 const REPORT_GROUPS = ['Assets', 'Liabilities', 'Income', 'Expenses'];
@@ -53,12 +62,6 @@ function defaultCategory(group, type) {
   if (group === 'Income') return 'Revenue from Operations';
   if (group === 'Expenses') return 'Other Expenses';
   return 'Other';
-}
-
-function categoryRank(group, category) {
-  const list = categoriesFor(group);
-  const i = list.indexOf(category);
-  return i === -1 ? list.length : i;
 }
 
 function normalizeAccount(a) {
@@ -120,7 +123,7 @@ function cashFlowStatement(accounts, vouchers, range) {
   const beginning = (a) => (before ? accountBalance(vouchers, a, { to: before }) : Number(a.opening) || 0);
   const ending = (a) => accountBalance(vouchers, a, to ? { to } : {});
   const change = (a) => ending(a) - beginning(a);
-  const isCash = (a) => a.group === 'Assets' && (a.type === 'Cash' || a.type === 'Bank');
+  const isCash = (a) => a.group === 'Assets' && isLiquidAccount(a);
   const catOf = (a) => a.category || defaultCategory(a.group, a.type);
 
   let income = 0;
@@ -197,9 +200,15 @@ function thisMonthKey() {
 }
 
 function numToWords(num) {
+  if (!Number.isFinite(num)) return '';
   const abs = Math.abs(num);
-  const rupees = Math.floor(abs);
-  const paise = Math.round((abs - rupees) * 100);
+  let rupees = Math.floor(abs);
+  let paise = Math.round((abs - rupees) * 100);
+  // Rounding can produce 100 paise (e.g. 1.999); carry it into the rupees.
+  if (paise >= 100) {
+    rupees += Math.floor(paise / 100);
+    paise %= 100;
+  }
   let words = rupees > 0 ? rupeesInWords(rupees) : 'Zero';
   if (paise > 0) words += ` and ${rupeesInWords(paise)} Paise`;
   return words;
@@ -260,10 +269,10 @@ if (typeof module !== 'undefined' && module.exports) {
     CATEGORIES,
     categoriesFor,
     defaultCategory,
-    categoryRank,
     normalizeAccount,
     prevDate,
     isLiquidType,
+    isLiquidAccount,
     cashFlowStatement,
     monthKey,
     thisMonthKey,

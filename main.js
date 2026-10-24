@@ -7,7 +7,33 @@ if (process.env.LEDGERPRO_SMOKE && !app.isPackaged) require('./scripts/smoke');
 
 const isMac = process.platform === 'darwin';
 const isWin = process.platform === 'win32';
-const TOPBAR_H = 78;
+const TOPBAR_H = 80;
+
+let flushDone = false;
+let flushing = null;
+
+// Ask the renderer to persist its pending debounced changes before allowing the
+// window to close / the app to quit. Bounded so a broken renderer can't hang quit.
+function flushRenderer(win) {
+  if (flushing) return flushing;
+  flushing = new Promise((resolve) => {
+    const timer = setTimeout(resolve, 2000);
+    const done = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    if (!win || win.isDestroyed()) return done();
+    win.webContents
+      .executeJavaScript(
+        '(typeof Store !== "undefined" && typeof Store.flushNow === "function") ? Store.flushNow() : Promise.resolve(true)'
+      )
+      .then(done, done);
+  }).then(() => {
+    flushDone = true;
+    flushing = null;
+  });
+  return flushing;
+}
 
 // macOS keeps the inset traffic lights; Windows uses a hidden title bar with the
 // native window controls drawn as an overlay in the top bar; Linux keeps its
@@ -44,6 +70,13 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (event, url) => {
     if (url !== win.webContents.getURL()) event.preventDefault();
+  });
+  win.on('close', (event) => {
+    if (flushDone) return;
+    event.preventDefault();
+    flushRenderer(win).finally(() => {
+      if (!win.isDestroyed()) win.close();
+    });
   });
   win.once('ready-to-show', () => win.show());
 }
@@ -116,7 +149,14 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (flushDone) return;
+  event.preventDefault();
+  const win = BrowserWindow.getAllWindows()[0];
+  flushRenderer(win).finally(() => app.quit());
+});
+
+app.on('will-quit', () => {
   db.close();
 });
 

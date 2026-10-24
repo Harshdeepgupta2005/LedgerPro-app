@@ -65,7 +65,7 @@ function showView(name) {
   if (!PAGE_META[name]) return;
   state.view = name;
 
-  $('#exitModal').hidden = true;
+  if (!$('#exitModal').hidden) closeModal($('#exitModal'));
 
   $$('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
   $$('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + name));
@@ -133,8 +133,16 @@ function closeExitConfirm() {
 }
 
 function quitApp() {
-  if (window.ledger && typeof window.ledger.quit === 'function') window.ledger.quit();
-  else window.close();
+  const finish = () => {
+    if (window.ledger && typeof window.ledger.quit === 'function') window.ledger.quit();
+    else window.close();
+  };
+  // Persist the pending debounced write before asking the main process to quit.
+  if (typeof Store !== 'undefined' && typeof Store.flushNow === 'function') {
+    Store.flushNow().then(finish, finish);
+  } else {
+    finish();
+  }
 }
 
 function ensureSelectOption(select, value) {
@@ -165,7 +173,7 @@ function populateCategoryOptions(group, selected, allowExtra) {
     opt.textContent = selected;
     select.appendChild(opt);
   }
-  if (selected && list.includes(selected)) select.value = selected;
+  if (selected) select.value = selected;
 }
 
 function syncLiquidField() {
@@ -258,7 +266,7 @@ function submitEntry() {
   }
 
   const amount = parseFloat(f.amount.value);
-  if (!amount || amount <= 0) return rejectEntry('Enter a valid amount.', f.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return rejectEntry('Enter a valid amount.', f.amount);
 
   let no;
   if (state.editingId) {
@@ -289,8 +297,10 @@ function submitEntry() {
     Store.updateVoucher(state.editingId, payload);
     hideLastSaved();
     toast('Voucher updated');
+    const ret = state.editReturnTo;
     resetEntryForm();
     renderCurrent();
+    if (ret && PAGE_META[ret]) showView(ret);
   } else {
     const saved = { id: Store.nextVoucherId(), ...payload };
     Store.addVoucher(saved);
@@ -357,7 +367,11 @@ function wireEvents() {
       const wasEditing = state.editingId === delV.dataset.deleteVoucher;
       Store.deleteVoucher(delV.dataset.deleteVoucher);
       if (state.lastSaved && state.lastSaved.id === delV.dataset.deleteVoucher) hideLastSaved();
-      if (wasEditing) resetEntryForm();
+      if (wasEditing) {
+        const ret = state.editReturnTo;
+        resetEntryForm();
+        if (ret && PAGE_META[ret]) showView(ret);
+      }
       renderCurrent();
       toast('Voucher deleted');
       return;
@@ -389,7 +403,7 @@ function wireEvents() {
 
   $$('.modal-overlay').forEach((overlay) => {
     overlay.addEventListener('mousedown', (e) => {
-      if (e.target === overlay) overlay.hidden = true;
+      if (e.target === overlay) closeModal(overlay);
     });
   });
 
@@ -490,7 +504,13 @@ function wireEvents() {
         return;
       }
       if (state.editingId) {
+        const ret = state.editReturnTo;
         resetEntryForm();
+        if (ret && PAGE_META[ret]) {
+          showView(ret);
+          return;
+        }
+        // If we came from the vouchers view (or don't know), just clear the form.
         return;
       }
       if (typing) {
@@ -504,7 +524,7 @@ function wireEvents() {
       // Escape always returns straight to the dashboard (never one-by-one),
       // and on the dashboard it asks to shut the app down.
       if (state.view === 'dashboard') openExitConfirm();
-      else showView('dashboard', { record: false });
+      else showView('dashboard');
       return;
     }
 
@@ -516,14 +536,15 @@ function wireEvents() {
     }
 
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      if (state.view !== 'vouchers') return;
-      e.preventDefault();
       if (modalOpen) {
+        e.preventDefault();
         const overlay = $$('.modal-overlay').find((o) => !o.hidden);
         const form = overlay && overlay.querySelector('form');
         if (form) form.requestSubmit();
         return;
       }
+      if (state.view !== 'vouchers') return;
+      e.preventDefault();
       submitEntry();
       return;
     }
@@ -605,7 +626,7 @@ function wireEvents() {
     Prefs.setBookDate(val);
     const entryForm = $('#entryForm');
     if (!state.editingId) entryForm.date.value = val;
-    $('#dateModal').hidden = true;
+    closeModal($('#dateModal'));
     renderTopbarCal();
     toast('Booking date set to ' + fmtDate(val));
   });
@@ -630,7 +651,7 @@ function wireEvents() {
     }
     state.period = { from, to };
     Prefs.setPeriod(state.period);
-    $('#periodModal').hidden = true;
+    closeModal($('#periodModal'));
     renderTopbarCal();
     renderCurrent();
     toast(`Reporting period ${fmtDate(from)} – ${fmtDate(to)}`);
@@ -639,7 +660,7 @@ function wireEvents() {
   $('#periodClearBtn').addEventListener('click', () => {
     state.period = null;
     Prefs.setPeriod(null);
-    $('#periodModal').hidden = true;
+    closeModal($('#periodModal'));
     renderTopbarCal();
     renderCurrent();
     toast('Reporting period cleared — All time');
@@ -772,6 +793,7 @@ function wireEvents() {
       $('#saveEntryBtn').textContent = 'Save Entry';
       setEntryType(v.type, { resetAccounts: false });
       const f = $('#entryForm');
+      f.no.value = v.no;
       f.date.value = v.date;
       setSide('dr', v.dr);
       setSide('cr', v.cr);
@@ -827,7 +849,7 @@ function wireEvents() {
         type: f.type.value,
         category: f.category.value || defaultCategory(f.group.value, f.type.value),
         liquid: f.liquid.value === '1',
-        opening: parseFloat(f.opening.value) || 0,
+        opening: Number.isFinite(parseFloat(f.opening.value)) ? parseFloat(f.opening.value) : 0,
       });
       toast('Account updated');
     } else {
@@ -838,12 +860,12 @@ function wireEvents() {
         type: f.type.value,
         category: f.category.value || defaultCategory(f.group.value, f.type.value),
         liquid: f.liquid.value === '1',
-        opening: parseFloat(f.opening.value) || 0,
+        opening: Number.isFinite(parseFloat(f.opening.value)) ? parseFloat(f.opening.value) : 0,
       });
       toast('Account created');
     }
 
-    $('#accountModal').hidden = true;
+    closeModal($('#accountModal'));
     syncLedgerFields({ preserve: true });
     renderCurrent();
   });
@@ -965,12 +987,11 @@ function init() {
     const v = window.ledger && window.ledger.appVersion;
     versionLabel.textContent = v ? `v${v}` : 'dev';
   }
+  Store.load();
   const storageLabel = document.getElementById('appStorageLabel');
   if (storageLabel) {
-    storageLabel.textContent =
-      window.ledger && window.ledger.hasSqlite === false ? 'LocalStorage mode' : 'Local SQLite';
+    storageLabel.textContent = Store.backend === 'sqlite' ? 'Local SQLite' : 'LocalStorage mode';
   }
-  Store.load();
   state.bookDate = Prefs.bookDate() || todayISO();
   state.period = Prefs.period();
   initTheme();

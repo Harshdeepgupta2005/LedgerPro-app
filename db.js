@@ -26,13 +26,13 @@ function stamp() {
 }
 
 function makeBackup() {
-  if (!backupDir) return;
+  if (!backupDir) return null;
   try {
     fs.mkdirSync(backupDir, { recursive: true });
     const rows = db
       .prepare('SELECT (SELECT COUNT(*) FROM accounts) AS a, (SELECT COUNT(*) FROM vouchers) AS v')
       .get();
-    if (!rows.a && !rows.v) return;
+    if (!rows.a && !rows.v) return null;
     const target = path.join(backupDir, `ledger-${stamp()}.db`);
     db.prepare('VACUUM INTO ?').run(target);
     const files = fs.readdirSync(backupDir).filter((f) => /^ledger-\d{8}-\d{6}(-\d+)?\.db$/.test(f));
@@ -48,8 +48,10 @@ function makeBackup() {
           }
         });
     }
+    return target;
   } catch (e) {
     console.error('Backup failed', e);
+    return null;
   }
 }
 
@@ -173,7 +175,7 @@ function load() {
     }));
   const vouchers = db
     .prepare(
-      'SELECT id, no, date, type, dr, cr, amount, narration, created_at FROM vouchers ORDER BY date, id'
+      'SELECT id, no, date, type, dr, cr, amount, narration, created_at FROM vouchers ORDER BY date, created_at, id'
     )
     .all()
     .map((r) => ({
@@ -208,6 +210,27 @@ function save(doc) {
   const accounts = Array.isArray(doc.accounts) ? doc.accounts : null;
   const vouchers = Array.isArray(doc.vouchers) ? doc.vouchers : null;
   if (!accounts || !vouchers) throw new Error('Invalid document: accounts/vouchers must be arrays');
+
+  // Refuse documents that would corrupt balances: every voucher must be finite,
+  // non-negative and point at two distinct accounts that exist in the document.
+  const accountIds = new Set(accounts.map((a) => String(a.id)));
+  for (const a of accounts) {
+    if (!String(a.id || '').trim() || !String(a.name || '').trim()) {
+      throw new Error('Invalid document: every account needs an id and a name');
+    }
+    if (a.opening != null && !Number.isFinite(Number(a.opening))) {
+      throw new Error(`Invalid opening balance on account ${a.id}`);
+    }
+  }
+  for (const v of vouchers) {
+    const amount = Number(v.amount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new Error(`Invalid amount on voucher ${v.id}`);
+    }
+    if (!accountIds.has(String(v.dr)) || !accountIds.has(String(v.cr))) {
+      throw new Error(`Voucher ${v.id} references an account that does not exist`);
+    }
+  }
 
   const upsertAccount = db.prepare(
     `INSERT INTO accounts (id, name, group_name, type, category, liquid, opening) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -337,8 +360,8 @@ function restoreFrom(source) {
   const check = validateDbFile(source);
   if (!check.ok) return check;
   if (!db || !dbPath) return { ok: false, error: 'Database not open' };
+  const backup = makeBackup();
   try {
-    makeBackup();
     close();
     fs.copyFileSync(String(source), dbPath);
     for (const ext of ['-wal', '-shm']) {
@@ -351,7 +374,39 @@ function restoreFrom(source) {
     open();
     return { ok: true, path: String(source) };
   } catch (e) {
-    return { ok: false, error: String((e && e.message) || e) };
+    // Never leave the app with a closed database: reopen whatever is on disk,
+    // and if the copied file is unusable, roll back to the safety backup.
+    let reopened = false;
+    try {
+      close();
+      open();
+      reopened = Boolean(db);
+    } catch (reopenErr) {
+      reopened = false;
+    }
+    if (!reopened && backup) {
+      try {
+        close();
+        fs.copyFileSync(backup, dbPath);
+        for (const ext of ['-wal', '-shm']) {
+          try {
+            fs.unlinkSync(dbPath + ext);
+          } catch (cleanupErr) {
+            /* ignore */
+          }
+        }
+        open();
+        reopened = Boolean(db);
+      } catch (rollbackErr) {
+        reopened = false;
+      }
+    }
+    return {
+      ok: false,
+      error: reopened
+        ? `${String((e && e.message) || e)} (previous database restored)`
+        : String((e && e.message) || e),
+    };
   }
 }
 

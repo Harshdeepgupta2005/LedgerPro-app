@@ -53,7 +53,7 @@ function inPeriod(v) {
 /* ---------- Shared row helpers ---------- */
 
 function byDateAsc(a, b) {
-  return a.date.localeCompare(b.date) || String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+  return compareVoucherOrder(a, b);
 }
 
 function byDateDesc(a, b) {
@@ -133,13 +133,13 @@ function renderDashboard() {
   const { income, expense } = monthlyFigures();
   const statsSub = state.period ? 'In selected period' : 'This month';
   const liquid = Store.db.accounts
-    .filter((a) => a.type === 'Cash' || a.type === 'Bank')
+    .filter((a) => a.group === 'Assets' && (a.type === 'Cash' || a.type === 'Bank'))
     .reduce((sum, a) => sum + Store.balanceOf(a.id), 0);
 
   const currentLiquid = Store.db.accounts.reduce((sum, a) => {
     const c = a.category || defaultCategory(a.group, a.type);
-    if (c === 'Current Assets' && isLiquid(a)) return sum + Store.balanceOf(a.id);
-    if (c === 'Current Liabilities') return sum - Store.balanceOf(a.id);
+    if (a.group === 'Assets' && c === 'Current Assets' && isLiquid(a)) return sum + Store.balanceOf(a.id);
+    if (a.group === 'Liabilities' && c === 'Current Liabilities') return sum - Store.balanceOf(a.id);
     return sum;
   }, 0);
 
@@ -209,19 +209,24 @@ function renderChart() {
     if (!b) continue;
     const dr = Store.account(v.dr);
     const cr = Store.account(v.cr);
+    // Net both sides so reversals (debit income / credit expense) are reflected,
+    // exactly like monthlyFigures() and the P&L statement.
+    if (dr && dr.group === 'Income') b.income -= v.amount;
     if (cr && cr.group === 'Income') b.income += v.amount;
     if (dr && dr.group === 'Expenses') b.expense += v.amount;
+    if (cr && cr.group === 'Expenses') b.expense -= v.amount;
   }
 
-  const max = Math.max(1, ...buckets.map((b) => Math.max(b.income, b.expense)));
+  const heights = buckets.map((b) => [Math.max(0, b.income), Math.max(0, b.expense)]).flat();
+  const max = Math.max(1, ...heights);
 
   $('#chart').innerHTML = buckets
     .map(
       (b) => `
       <div class="chart-group" title="Income ${fmt(b.income)} · Expenses ${fmt(b.expense)}">
         <div class="chart-bars">
-          <div class="bar bar-income" style="height:${Math.round((b.income / max) * 100)}%"></div>
-          <div class="bar bar-expense" style="height:${Math.round((b.expense / max) * 100)}%"></div>
+          <div class="bar bar-income" style="height:${Math.round((Math.max(0, b.income) / max) * 100)}%"></div>
+          <div class="bar bar-expense" style="height:${Math.round((Math.max(0, b.expense) / max) * 100)}%"></div>
         </div>
         <span class="chart-label">${b.label}</span>
       </div>`
@@ -285,9 +290,7 @@ const TYPE_META = {
 };
 
 function isLiquid(a) {
-  if (a && typeof a.liquid === 'boolean') return a.liquid;
-  if (a && typeof a.category === 'string' && a.category) return isLiquidType(a.type);
-  return isLiquidType(a.type);
+  return isLiquidAccount(a);
 }
 
 function ledgerList(side) {
@@ -295,7 +298,7 @@ function ledgerList(side) {
   const cashOnly = side === 'dr' ? meta.drCashOnly : meta.crCashOnly;
   const all = Store.db.accounts;
   const liquid = all.filter(isLiquid);
-  return cashOnly && liquid.length ? liquid : all;
+  return cashOnly ? liquid : all;
 }
 
 function sideInput(side) {
@@ -491,7 +494,8 @@ function renderGlobalResults() {
   clear.hidden = !state.search;
   const q = (state.search || '').trim();
   const isFilterView = state.view === 'accounts' || state.view === 'register';
-  if (!q || isFilterView) {
+  const focused = document.activeElement === $('#searchInput');
+  if (!q || isFilterView || !focused) {
     box.hidden = true;
     box.innerHTML = '';
     state.resultIndex = 0;
@@ -662,11 +666,12 @@ function hideLastSaved() {
 function resetEntryForm() {
   const f = $('#entryForm');
   state.editingId = null;
+  state.editReturnTo = null;
   $('#entryError').hidden = true;
   $('#saveEntryBtn').textContent = 'Save Entry';
   f.amount.value = '';
   f.narration.value = '';
-  if (!f.date.value) f.date.value = getBookDate();
+  f.date.value = getBookDate();
   setEntryType(state.entryType, { resetAccounts: true });
   $('#amountWords').textContent = '';
   updateBalanceHints();
@@ -677,6 +682,8 @@ function startEditVoucher(id) {
   if (!v) return;
   closeLedger();
   hideLastSaved();
+  const ret = state.view && state.view !== 'vouchers' ? state.view : state.editReturnTo;
+  state.editReturnTo = ret || null;
   state.editingId = id;
   showView('vouchers');
 
@@ -906,36 +913,76 @@ function fillPrintLedger(a) {
   const data = ledgerRowsData(a);
   const opening = ledgerStartBalance(a);
   const closing = data.length ? data[data.length - 1].bal : opening;
+  const generated = new Date().toLocaleString('en-IN', {
+    year: 'numeric',
+    month: 'long',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const periodStr = state.period ? periodLabel() : 'All time';
   $('#printLedger').innerHTML = `
     <div class="pl-head">
-      <h1>${esc(a.name)} — Ledger</h1>
-      <p>${esc(a.group)} · ${esc(a.type)} account · Opening ${fmt(opening)} · Closing ${fmt(closing)}</p>
-      <p class="pl-date">Generated on ${new Date().toLocaleString('en-IN')}</p>
+      <div class="pl-brand">
+        <img src="assets/icon-256.png" alt="LedgerPro" />
+        <div>
+          <h1>Ledger Account</h1>
+          <p class="pl-app">LedgerPro</p>
+        </div>
+      </div>
+      <div class="pl-meta">
+        <div><span>Account Name</span><strong>${esc(a.name)}</strong></div>
+        <div><span>Group / Type</span><strong>${esc(a.group)} · ${esc(a.type)}</strong></div>
+        <div><span>Period</span><strong>${esc(periodStr)}</strong></div>
+        <div><span>Generated On</span><strong>${esc(generated)}</strong></div>
+      </div>
+    </div>
+    <div class="pl-summary">
+      <div class="pl-sum"><span>Opening Balance</span><strong>${fmt(opening)}</strong></div>
+      <div class="pl-sum"><span>Total Debits</span><strong>${fmt(data.reduce((s, x) => s + (x.isDebit ? x.v.amount : 0), 0))}</strong></div>
+      <div class="pl-sum"><span>Total Credits</span><strong>${fmt(data.reduce((s, x) => s + (x.isDebit ? 0 : x.v.amount), 0))}</strong></div>
+      <div class="pl-sum pl-sum--close"><span>Closing Balance</span><strong>${fmt(closing)}</strong></div>
     </div>
     <table class="pl-table">
       <thead>
-        <tr><th scope="col">Date</th><th scope="col">Voucher</th><th scope="col">Particulars</th><th class="num" scope="col">Debit</th><th class="num" scope="col">Credit</th><th class="num" scope="col">Balance</th></tr>
+        <tr>
+          <th scope="col">Date</th>
+          <th scope="col">Voucher No.</th>
+          <th scope="col">Voucher Type</th>
+          <th scope="col">Particulars</th>
+          <th scope="col">Narration</th>
+          <th class="num" scope="col">Debit (₹)</th>
+          <th class="num" scope="col">Credit (₹)</th>
+          <th class="num" scope="col">Balance (₹)</th>
+        </tr>
       </thead>
       <tbody>
-        <tr class="pl-strong"><td colspan="5">Opening balance</td><td class="num">${fmt(opening)}</td></tr>
-        ${data
-          .map(
-            ({ v, isDebit, other, bal }) => `
+        <tr class="pl-strong"><td colspan="7">Opening Balance</td><td class="num">${fmt(opening)}</td></tr>
+        ${
+          data.length
+            ? data
+                .map(
+                  ({ v, isDebit, other, bal }) => `
         <tr>
           <td>${fmtDate(v.date)}</td>
-          <td>${esc(v.no)}<span class="pl-sub">${esc(v.type)}</span></td>
-          <td>${esc(other)}${v.narration ? `<span class="pl-sub">${esc(v.narration)}</span>` : ''}</td>
-          <td class="num">${isDebit ? fmt(v.amount) : ''}</td>
-          <td class="num">${isDebit ? '' : fmt(v.amount)}</td>
-          <td class="num">${fmt(bal)}</td>
+          <td class="mono">${esc(v.no)}</td>
+          <td>${esc(v.type)}</td>
+          <td>${esc(other)}</td>
+          <td>${v.narration ? esc(v.narration) : '—'}</td>
+          <td class="num">${isDebit ? fmt(v.amount) : '—'}</td>
+          <td class="num">${isDebit ? '—' : fmt(v.amount)}</td>
+          <td class="num ${bal < 0 ? 'text-red' : ''}">${fmt(bal)}</td>
         </tr>`
-          )
-          .join('')}
+                )
+                .join('')
+            : '<tr><td colspan="8" class="pl-empty">No transactions in this period.</td></tr>'
+        }
       </tbody>
       <tfoot>
-        <tr class="pl-strong"><td colspan="5">Closing balance</td><td class="num">${fmt(closing)}</td></tr>
+        <tr class="pl-strong"><td colspan="7">Closing Balance</td><td class="num">${fmt(closing)}</td></tr>
       </tfoot>
-    </table>`;
+    </table>
+    <div class="pl-footer">This is a computer-generated ledger from LedgerPro.</div>`;
 }
 
 function exportLedgerCSV() {
@@ -996,14 +1043,14 @@ function renderReports() {
   $('#reportPicker').hidden = true;
   $('#reportCard').hidden = false;
   $('#reportTitle').textContent = meta.title;
-  $('#reportSub').textContent = `${meta.sub} · Schedule III · ${periodLabel()}`;
+  $('#reportSub').textContent = `${meta.sub} · ${periodLabel()}`;
   if (state.report === 'trial') renderTrialBalance();
   else if (state.report === 'pl') renderPLStatement();
   else if (state.report === 'balance') renderBalanceSheet();
-  else if (state.report === 'cashflow') renderCashFlowStatement();
+  else if (state.report === 'cashflow') renderCashFlowStatementImproved();
 }
 
-// Accounts grouped by their Schedule III category, in statement order.
+// Accounts grouped by their category for display.
 function accountsByGroupAndCategory(group) {
   const map = new Map();
   for (const a of Store.db.accounts) {
@@ -1037,84 +1084,58 @@ function closeReport() {
 
 function renderTrialBalance() {
   const range = asOfRange();
-  let totalDr = 0;
-  let totalCr = 0;
-  let body = '';
+  const accounts = Store.db.accounts
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
 
-  for (const group of REPORT_GROUPS) {
-    const cats = accountsByGroupAndCategory(group);
-    let groupDr = 0;
-    let groupCr = 0;
-    let rows = '';
-    for (const { category, accounts } of cats) {
-      let catDr = 0;
-      let catCr = 0;
-      let accRows = '';
-      for (const a of accounts) {
-        const bal = Store.balanceOf(a.id, range);
-        if (bal === 0) continue;
-        const isDebit = isDebitNormal(a) ? bal >= 0 : bal < 0;
-        const amount = Math.abs(bal);
-        if (isDebit) catDr += amount;
-        else catCr += amount;
-        accRows += `
-          <tr>
-            <td><span class="cell-title">${esc(a.name)}</span></td>
-            <td>${typeBadge(a.type)}</td>
-            <td class="num">${isDebit ? `<strong>${fmt(amount)}</strong>` : '—'}</td>
-            <td class="num">${!isDebit ? `<strong>${fmt(amount)}</strong>` : '—'}</td>
-          </tr>`;
-      }
-      if (!accRows) continue;
-      groupDr += catDr;
-      groupCr += catCr;
-      rows += `
-        <tr class="report-subhead"><td colspan="4">${esc(group)} · ${esc(category)}</td></tr>
-        ${accRows}
-        <tr class="report-subtotal">
-          <td colspan="2">Subtotal — ${esc(category)}</td>
-          <td class="num" data-cat-dr="${catDr}">${fmt(catDr)}</td>
-          <td class="num" data-cat-cr="${catCr}">${fmt(catCr)}</td>
+  let debitTotal = 0;
+  let creditTotal = 0;
+
+  const rows = accounts
+    .map((a) => {
+      const bal = Store.balanceOf(a.id, range);
+      if (Math.abs(bal) < 0.005) return '';
+      const debitNormal = isDebitNormal(a);
+      const isDr = debitNormal ? bal >= 0 : bal < 0;
+      const amount = Math.abs(bal);
+      if (isDr) debitTotal += amount;
+      else creditTotal += amount;
+      return `
+        <tr>
+          <td class="t-particulars">${esc(a.name)}</td>
+          <td class="num">${isDr ? fmt(amount) : '—'}</td>
+          <td class="num">${isDr ? '—' : fmt(amount)}</td>
         </tr>`;
-    }
-    if (!rows) continue;
-    totalDr += groupDr;
-    totalCr += groupCr;
-    body += `
-      <tr class="report-group"><td colspan="4">${esc(group)}</td></tr>
-      ${rows}
-      <tr class="report-subtotal report-group-total">
-        <td colspan="2">Total ${esc(group)}</td>
-        <td class="num">${fmt(groupDr)}</td>
-        <td class="num">${fmt(groupCr)}</td>
-      </tr>`;
-  }
+    })
+    .join('');
 
-  const offBy = Math.abs(totalDr - totalCr);
-  const balanced = offBy < 0.005;
   $('#reportBody').innerHTML = `
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr><th scope="col">Account</th><th scope="col">Type</th><th class="num" scope="col">Debit</th><th class="num" scope="col">Credit</th></tr>
-        </thead>
-        <tbody>${body || '<tr><td colspan="4" class="empty">No balances to show.</td></tr>'}</tbody>
-        <tfoot>
-          <tr>
-            <td colspan="2">Grand total</td>
-            <td class="num" data-total-dr="${totalDr}">${fmt(totalDr)}</td>
-            <td class="num" data-total-cr="${totalCr}">${fmt(totalCr)}</td>
-          </tr>
-          ${
-            balanced
-              ? ''
-              : `
-          <tr class="off-balance">
-            <td colspan="4">Out of balance by ${fmt(offBy)} — check opening balances.</td>
-          </tr>`
-          }
-        </tfoot>
-      </table>
+    <div class="rpt-wrap">
+      <div class="rpt-header">
+        <div class="rpt-title">Trial Balance</div>
+        <div class="rpt-sub">As on ${esc(range ? fmtDate(range.to) : fmtDate(todayISO()))}${state.period ? ` · ${esc(periodLabel())}` : ''}</div>
+      </div>
+      <div class="rpt-card">
+        <table class="rpt-table">
+          <thead>
+            <tr>
+              <th class="th-left">Account</th>
+              <th class="th-right">Debit</th>
+              <th class="th-right">Credit</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="3" class="rpt-empty">No accounts with balance</td></tr>'}
+          </tbody>
+          <tfoot>
+            <tr class="rpt-grand">
+              <td>Total</td>
+              <td class="num">${fmt(debitTotal)}</td>
+              <td class="num">${fmt(creditTotal)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>`;
 }
 
@@ -1144,147 +1165,134 @@ function plFigures(range) {
 
 function renderPLStatement() {
   const range = reportRange();
-  const { income, expense, net, flows } = plFigures(range);
+  const flows = periodFlows(range);
 
   const lineBalance = (a) => {
     const f = flows[a.id] || { dr: 0, cr: 0 };
     return a.group === 'Income' ? f.cr - f.dr : f.dr - f.cr;
   };
 
-  const categoryBlock = (category, accounts) => {
-    let subtotal = 0;
-    const rows = accounts
-      .map((a) => {
-        const bal = lineBalance(a);
-        if (bal === 0) return '';
-        subtotal += bal;
-        return `
-          <tr>
-            <td class="pl-item"><span class="cell-title">${esc(a.name)}</span>${typeBadge(a.type)}</td>
-            <td class="num">${bal < 0 ? `<strong class="text-red">${fmt(bal)}</strong>` : fmt(bal)}</td>
-          </tr>`;
-      })
-      .join('');
-    if (!rows) return '';
-    return `
-      <tr class="report-subhead"><td colspan="2">${esc(category)}</td></tr>
-      ${rows}
-      <tr class="report-subtotal">
-        <td>Subtotal — ${esc(category)}</td>
-        <td class="num" data-cat-total="${subtotal}">${fmt(subtotal)}</td>
-      </tr>`;
-  };
+  let expTotal = 0;
+  let incTotal = 0;
 
-  const incomeRows = accountsByGroupAndCategory('Income')
-    .map(({ category, accounts }) => categoryBlock(category, accounts))
+  const expenseList = Store.db.accounts
+    .filter((a) => a.group === 'Expenses')
+    .map((a) => ({ a, bal: lineBalance(a) }))
+    .filter((x) => Math.abs(x.bal) > 0.005)
+    .sort((a, b) => a.a.name.localeCompare(b.a.name));
+  const incomeList = Store.db.accounts
+    .filter((a) => a.group === 'Income')
+    .map((a) => ({ a, bal: lineBalance(a) }))
+    .filter((x) => Math.abs(x.bal) > 0.005)
+    .sort((a, b) => a.a.name.localeCompare(b.a.name));
+
+  for (const x of expenseList) expTotal += x.bal;
+  for (const x of incomeList) incTotal += x.bal;
+  const profit = incTotal - expTotal;
+
+  const expRows = expenseList
+    .map((x) => `<tr><td>${esc(x.a.name)}</td><td class="num">${fmt(x.bal)}</td></tr>`)
     .join('');
-  const expenseRows = accountsByGroupAndCategory('Expenses')
-    .map(({ category, accounts }) => categoryBlock(category, accounts))
+  const incRows = incomeList
+    .map((x) => `<tr><td>${esc(x.a.name)}</td><td class="num">${fmt(x.bal)}</td></tr>`)
     .join('');
 
   $('#reportBody').innerHTML = `
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr><th scope="col">Particulars</th><th class="num" scope="col">Amount</th></tr>
-        </thead>
-        <tbody>
-          <tr class="report-group"><td colspan="2">Income</td></tr>
-          ${incomeRows || '<tr><td colspan="2" class="empty">No income in this period.</td></tr>'}
-          <tr class="report-total">
-            <td>Total Income</td>
-            <td class="num" data-total-income="${income}">${fmt(income)}</td>
-          </tr>
-          <tr class="report-group"><td colspan="2">Expenses</td></tr>
-          ${expenseRows || '<tr><td colspan="2" class="empty">No expenses in this period.</td></tr>'}
-          <tr class="report-total">
-            <td>Total Expenses</td>
-            <td class="num" data-total-expense="${expense}">${fmt(expense)}</td>
-          </tr>
-          <tr class="report-grand">
-            <td>${net >= 0 ? 'Profit' : 'Loss'} for the period (before tax)</td>
-            <td class="num ${net < 0 ? 'text-red' : 'text-green'}" data-total-net="${Math.abs(net)}">${fmt(Math.abs(net))}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="rpt-wrap">
+      <div class="rpt-header">
+        <div class="rpt-title">Profit &amp; Loss</div>
+        <div class="rpt-sub">${esc(periodLabel())}</div>
+      </div>
+      <div class="rpt-card">
+        <table class="rpt-table">
+          <thead>
+            <tr>
+              <th class="th-left">Account</th>
+              <th class="th-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="rpt-section"><td colspan="2">Expenses</td></tr>
+            ${expRows || '<tr><td colspan="2" class="rpt-empty">No expenses</td></tr>'}
+            <tr class="rpt-subtotal"><td>Total Expenses</td><td class="num">${fmt(expTotal)}</td></tr>
+            <tr class="rpt-section"><td colspan="2">Income</td></tr>
+            ${incRows || '<tr><td colspan="2" class="rpt-empty">No income</td></tr>'}
+            <tr class="rpt-subtotal"><td>Total Income</td><td class="num">${fmt(incTotal)}</td></tr>
+          </tbody>
+          <tfoot>
+            <tr class="rpt-grand">
+              <td>${profit >= 0 ? 'Profit' : 'Loss'}</td>
+              <td class="num">${fmt(Math.abs(profit))}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>`;
 }
 
 function renderBalanceSheet() {
   const range = asOfRange();
-  const { net } = plFigures(range);
+  const flows = periodFlows(range);
 
-  // Retained earnings carried in opening balances: a credit opening on an Income
-  // account or a debit opening on an Expense account is prior-period capital.
-  let retainedOpening = 0;
+  const assets = Store.db.accounts
+    .filter((a) => a.group === 'Assets')
+    .map((a) => ({ a, amt: Store.balanceOf(a.id, range) }))
+    .filter((x) => Math.abs(x.amt) > 0.005)
+    .sort((a, b) => a.a.name.localeCompare(b.a.name));
+
+  const liabilities = Store.db.accounts
+    .filter((a) => a.group === 'Liabilities')
+    .map((a) => ({ a, amt: Store.balanceOf(a.id, range) }))
+    .filter((x) => Math.abs(x.amt) > 0.005)
+    .sort((a, b) => a.a.name.localeCompare(b.a.name));
+
+  let income = 0;
+  let expense = 0;
   for (const a of Store.db.accounts) {
-    const op = Number(a.opening) || 0;
-    if (a.group === 'Income') retainedOpening += op;
-    else if (a.group === 'Expenses') retainedOpening -= op;
+    const f = flows[a.id] || { dr: 0, cr: 0 };
+    if (a.group === 'Income') income += f.cr - f.dr;
+    if (a.group === 'Expenses') expense += f.dr - f.cr;
   }
-  const retained = retainedOpening + net;
+  const profit = income - expense;
 
-  const panel = (group) => {
-    let total = 0;
-    const blocks = accountsByGroupAndCategory(group)
-      .map(({ category, accounts }) => {
-        let subtotal = 0;
-        const rows = accounts
-          .map((a) => {
-            const bal = Store.balanceOf(a.id, range);
-            if (bal === 0) return '';
-            subtotal += bal;
-            total += bal;
-            return `
-              <div class="bs-row">
-                <span>${esc(a.name)} <span class="muted">· ${esc(a.type)}</span></span>
-                <span class="num ${bal < 0 ? 'text-red' : ''}">${fmt(bal)}</span>
-              </div>`;
-          })
-          .join('');
-        if (!rows) return '';
-        return `
-          <div class="bs-cat">${esc(category)}</div>
-          ${rows}
-          <div class="bs-cat-total" data-cat-total="${subtotal}">
-            <span>Subtotal — ${esc(category)}</span>
-            <span class="num">${fmt(subtotal)}</span>
-          </div>`;
-      })
-      .join('');
-    return { blocks, total };
-  };
+  const assetsTotal = assets.reduce((s, x) => s + x.amt, 0);
+  const liabTotal = liabilities.reduce((s, x) => s + x.amt, 0);
 
-  const liab = panel('Liabilities');
-  const assets = panel('Assets');
-  const liabilitiesTotal = liab.total + retained;
-  const offBy = Math.abs(assets.total - liabilitiesTotal);
-  const balanced = offBy < 0.005;
+  const assetRows = assets.map((x) => `<tr><td>${esc(x.a.name)}</td><td class="num">${fmt(x.amt)}</td></tr>`).join('');
+  const liabRows = liabilities.map((x) => `<tr><td>${esc(x.a.name)}</td><td class="num">${fmt(x.amt)}</td></tr>`).join('');
 
   $('#reportBody').innerHTML = `
-    <div class="bs-grid">
-      <div class="bs-panel">
-        <div class="bs-head">Equity &amp; Liabilities</div>
-        ${liab.blocks || '<div class="bs-empty muted">No balances.</div>'}
-        <div class="bs-note">
-          <span>${retained >= 0 ? 'Add' : 'Less'} Retained earnings (reserves &amp; surplus)</span>
-          <strong class="num" data-total-net="${Math.abs(net)}" data-total-retained="${retained}">${fmt(Math.abs(retained))}</strong>
+    <div class="rpt-wrap">
+      <div class="rpt-header">
+        <div class="rpt-title">Balance Sheet</div>
+        <div class="rpt-sub">As on ${esc(range ? fmtDate(range.to) : fmtDate(todayISO()))}</div>
+      </div>
+      <div class="rpt-bs-grid">
+        <div class="rpt-bs-panel">
+          <div class="rpt-bs-head"><span>Liabilities</span><span>Amount</span></div>
+          <table class="rpt-bs-table">
+            <tbody>
+              ${liabRows || '<tr><td colspan="2" class="rpt-empty">No liabilities</td></tr>'}
+              <tr><td>Capital (${profit >= 0 ? 'Profit' : 'Loss'})</td><td class="num">${fmt(Math.abs(profit))}</td></tr>
+            </tbody>
+            <tfoot>
+              <tr class="rpt-grand"><td>Total</td><td class="num">${fmt(liabTotal + profit)}</td></tr>
+            </tfoot>
+          </table>
         </div>
-        <div class="bs-total">
-          <span>Total Equity &amp; Liabilities</span>
-          <span class="num" data-total-liabilities="${liabilitiesTotal}">${fmt(liabilitiesTotal)}</span>
+        <div class="rpt-bs-panel">
+          <div class="rpt-bs-head"><span>Assets</span><span>Amount</span></div>
+          <table class="rpt-bs-table">
+            <tbody>
+              ${assetRows || '<tr><td colspan="2" class="rpt-empty">No assets</td></tr>'}
+            </tbody>
+            <tfoot>
+              <tr class="rpt-grand"><td>Total</td><td class="num">${fmt(assetsTotal)}</td></tr>
+            </tfoot>
+          </table>
         </div>
       </div>
-      <div class="bs-panel">
-        <div class="bs-head">Assets</div>
-        ${assets.blocks || '<div class="bs-empty muted">No balances.</div>'}
-        <div class="bs-total">
-          <span>Total Assets</span>
-          <span class="num" data-total-assets="${assets.total}">${fmt(assets.total)}</span>
-        </div>
-      </div>
-    </div>
-    ${balanced ? '' : `<div class="off-balance">Out of balance by ${fmt(offBy)} — check opening balances.</div>`}`;
+    </div>`;
 }
 
 function renderCashFlowStatement() {
@@ -1293,65 +1301,98 @@ function renderCashFlowStatement() {
   const to = range ? range.to : null;
   const cf = cashFlowStatement(Store.db.accounts, Store.db.vouchers, range);
 
-  const isCash = (a) => a.group === 'Assets' && (a.type === 'Cash' || a.type === 'Bank');
-  const cashAccounts = Store.db.accounts.filter(isCash);
+  const isCashAcc = (a) => a.group === 'Assets' && isLiquid(a);
+  const cashAccounts = Store.db.accounts.filter(isCashAcc);
   const openingCash = from
     ? cashAccounts.reduce((s, a) => s + Store.balanceOf(a.id, { to: prevDate(from) }), 0)
     : cashAccounts.reduce((s, a) => s + (Number(a.opening) || 0), 0);
   const closingCash = cashAccounts.reduce((s, a) => s + Store.balanceOf(a.id, to ? { to } : {}), 0);
 
-  const block = (title, lines, total, attr) => {
-    const rows = lines.length
-      ? lines
-          .map(
-            (l) =>
-              `<tr><td class="pl-item">${esc(l.name)}</td><td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td></tr>`
-          )
-          .join('')
-      : '<tr><td colspan="2" class="empty">No movements in this section.</td></tr>';
-    return `
-      <tr class="report-group"><td colspan="2">${esc(title)}</td></tr>
-      ${rows}
-      <tr class="report-total">
-        <td>Net cash from ${esc(title.replace(/^[A-C]\.\s*/, ''))}</td>
-        <td class="num" ${attr}="${total}">${fmt(total)}</td>
-      </tr>`;
-  };
+  const opRows = cf.operating
+    .map(
+      (l) => `
+        <tr>
+          <td class="rpt-part">${esc(l.name)}</td>
+          <td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td>
+        </tr>`
+    )
+    .join('');
 
-  const operating = [{ name: 'Net profit for the period', amount: cf.netProfit }].concat(cf.operating);
+  const invRows = cf.investing
+    .map(
+      (l) => `
+        <tr>
+          <td class="rpt-part">${esc(l.name)}</td>
+          <td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td>
+        </tr>`
+    )
+    .join('');
+
+  const finRows = cf.financing
+    .map(
+      (l) => `
+        <tr>
+          <td class="rpt-part">${esc(l.name)}</td>
+          <td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td>
+        </tr>`
+    )
+    .join('');
 
   $('#reportBody').innerHTML = `
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr><th scope="col">Particulars</th><th class="num" scope="col">Amount</th></tr>
-        </thead>
-        <tbody>
-          ${block('A. Operating activities', operating, cf.cfo, 'data-total-cfo')}
-          ${block('B. Investing activities', cf.investing, cf.cfi, 'data-total-cfi')}
-          ${block('C. Financing activities', cf.financing, cf.cff, 'data-total-cff')}
-          <tr class="report-grand">
-            <td>Net increase / (decrease) in cash</td>
-            <td class="num" data-total-netcash="${cf.netCash}">${fmt(cf.netCash)}</td>
-          </tr>
-          <tr class="report-total">
-            <td>Cash &amp; cash equivalents — opening</td>
-            <td class="num" data-total-cash-open="${openingCash}">${fmt(openingCash)}</td>
-          </tr>
-          <tr class="report-grand">
-            <td>Cash &amp; cash equivalents — closing</td>
-            <td class="num" data-total-cash-close="${closingCash}">${fmt(closingCash)}</td>
-          </tr>
-          ${
-            cf.balanced
-              ? ''
-              : `
-          <tr class="off-balance">
-            <td colspan="2">Cash movement does not reconcile by ${fmt(Math.abs(cf.netCash - cf.cashChange))}.</td>
-          </tr>`
-          }
-        </tbody>
-      </table>
+    <div class="rpt-wrap">
+      <div class="rpt-header">
+        <div class="rpt-title">Cash Flow Statement</div>
+        <div class="rpt-sub">For the period ${esc(periodLabel())}</div>
+      </div>
+      <div class="rpt-card">
+        <table class="rpt-cf-table">
+          <thead>
+            <tr>
+              <th class="th-left">Particulars</th>
+              <th class="th-right">Amount (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="rpt-section"><td colspan="2">A. Cash Flow from Operating Activities</td></tr>
+            <tr>
+              <td class="rpt-part">Net Profit / (Loss) as per Profit &amp; Loss Account</td>
+              <td class="num ${cf.netProfit < 0 ? 'text-red' : ''}">${fmt(cf.netProfit)}</td>
+            </tr>
+            ${opRows}
+            <tr class="rpt-subtotal">
+              <td>Net Cash generated from Operating Activities (A)</td>
+              <td class="num ${cf.cfo < 0 ? 'text-red' : ''}">${fmt(cf.cfo)}</td>
+            </tr>
+            <tr class="rpt-section"><td colspan="2">B. Cash Flow from Investing Activities</td></tr>
+            ${invRows || '<tr><td colspan="2" class="rpt-empty">No investing activities</td></tr>'}
+            <tr class="rpt-subtotal">
+              <td>Net Cash used in / generated from Investing Activities (B)</td>
+              <td class="num ${cf.cfi < 0 ? 'text-red' : ''}">${fmt(cf.cfi)}</td>
+            </tr>
+            <tr class="rpt-section"><td colspan="2">C. Cash Flow from Financing Activities</td></tr>
+            ${finRows || '<tr><td colspan="2" class="rpt-empty">No financing activities</td></tr>'}
+            <tr class="rpt-subtotal">
+              <td>Net Cash used in / generated from Financing Activities (C)</td>
+              <td class="num ${cf.cff < 0 ? 'text-red' : ''}">${fmt(cf.cff)}</td>
+            </tr>
+            <tr class="rpt-section"><td colspan="2">Net Increase / (Decrease) in Cash &amp; Cash Equivalents (A+B+C)</td></tr>
+            <tr>
+              <td class="rpt-part">Net Increase / (Decrease) in Cash &amp; Bank Balances</td>
+              <td class="num ${cf.netCash < 0 ? 'text-red' : ''}">${fmt(cf.netCash)}</td>
+            </tr>
+            <tr>
+              <td class="rpt-part">Add: Opening Cash &amp; Bank Balances</td>
+              <td class="num">${fmt(openingCash)}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="rpt-grand">
+              <td>Closing Cash &amp; Bank Balances</td>
+              <td class="num">${fmt(closingCash)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>`;
 }
 
@@ -1446,4 +1487,73 @@ const renderers = {
 function renderCurrent() {
   if (renderers[state.view]) renderers[state.view]();
   if (state.ledgerId && !$('#ledgerOverlay').hidden) renderLedger();
+}
+
+
+function renderCashFlowStatementImproved() {
+  const range = reportRange();
+  const from = range ? range.from : null;
+  const to = range ? range.to : null;
+
+  const isCashAcc = (a) => a.group === 'Assets' && isLiquid(a);
+  const cashAccounts = Store.db.accounts.filter(isCashAcc);
+  const openingCash = from
+    ? cashAccounts.reduce((s, a) => s + Store.balanceOf(a.id, { to: prevDate(from) }), 0)
+    : cashAccounts.reduce((s, a) => s + (Number(a.opening) || 0), 0);
+  const closingCash = cashAccounts.reduce((s, a) => s + Store.balanceOf(a.id, to ? { to } : {}), 0);
+
+  const inRows = [];
+  const outRows = [];
+
+  for (const v of Store.db.vouchers) {
+    if (range && range.from && v.date < range.from) continue;
+    if (range && range.to && v.date > range.to) continue;
+    const drAcc = Store.account(v.dr);
+    const crAcc = Store.account(v.cr);
+    const isDrCash = drAcc && isCashAcc(drAcc);
+    const isCrCash = crAcc && isCashAcc(crAcc);
+    if (isDrCash && !isCrCash) inRows.push({ name: crAcc?.name || 'Received', amt: v.amount });
+    if (isCrCash && !isDrCash) outRows.push({ name: drAcc?.name || 'Paid', amt: v.amount });
+  }
+
+  const inTotal = inRows.reduce((s, x) => s + x.amt, 0);
+  const outTotal = outRows.reduce((s, x) => s + x.amt, 0);
+  const net = closingCash - openingCash;
+
+  const inHtml = inRows.map((x) => `<tr><td>${esc(x.name)}</td><td class="num">${fmt(x.amt)}</td></tr>`).join('');
+  const outHtml = outRows.map((x) => `<tr><td>${esc(x.name)}</td><td class="num">${fmt(x.amt)}</td></tr>`).join('');
+
+  $('#reportBody').innerHTML = `
+    <div class="rpt-wrap">
+      <div class="rpt-header">
+        <div class="rpt-title">Cash Flow</div>
+        <div class="rpt-sub">${esc(periodLabel())}</div>
+      </div>
+      <div class="rpt-card">
+        <table class="rpt-table">
+          <thead>
+            <tr>
+              <th class="th-left">Account</th>
+              <th class="th-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="rpt-section"><td colspan="2">Money In</td></tr>
+            ${inHtml || '<tr><td colspan="2" class="rpt-empty">No cash received</td></tr>'}
+            <tr class="rpt-subtotal"><td>Total Money In</td><td class="num">${fmt(inTotal)}</td></tr>
+            <tr class="rpt-section"><td colspan="2">Money Out</td></tr>
+            ${outHtml || '<tr><td colspan="2" class="rpt-empty">No cash paid</td></tr>'}
+            <tr class="rpt-subtotal"><td>Total Money Out</td><td class="num">${fmt(outTotal)}</td></tr>
+            <tr><td>Opening Cash/Bank</td><td class="num">${fmt(openingCash)}</td></tr>
+            <tr><td>Closing Cash/Bank</td><td class="num">${fmt(closingCash)}</td></tr>
+          </tbody>
+          <tfoot>
+            <tr class="rpt-grand">
+              <td>Net Change</td>
+              <td class="num">${fmt(net)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
 }

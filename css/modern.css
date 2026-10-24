@@ -2791,3 +2791,584 @@ body {
 [data-theme='dark'] .topbar {
   background: color-mix(in srgb, var(--surface) 72%, transparent);
 }
+
+
+/* ---------- Professional T-Shaped Reports ---------- */
+
+.t-report {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.t-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 22px;
+  margin-bottom: 18px;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.t-head > div:first-child {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
+.t-head > div:last-child {
+  font-size: 13px;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+
+.t-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.t-panel {
+  background: var(--grad-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.t-panel-head {
+  padding: 14px 20px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  background: linear-gradient(90deg, var(--primary-soft) 0%, transparent 100%);
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.t-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.t-table thead th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ink-3);
+  padding: 10px 20px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.t-table thead th.num {
+  text-align: right;
+}
+
+.t-table tbody td {
+  padding: 9px 20px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  vertical-align: middle;
+}
+
+.t-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.t-table .t-item {
+  font-weight: 600;
+}
+
+.t-table .t-muted {
+  color: var(--ink-3);
+  font-weight: 500;
+  font-size: 12.5px;
+}
+
+.t-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.t-table .t-subhead td {
+  background: var(--surface-2);
+  font-weight: 700;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ink-2);
+  padding: 8px 20px;
+}
+
+.t-table .t-subtotal td {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  font-weight: 700;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.t-table tfoot .t-total td {
+  background: linear-gradient(90deg, var(--primary-soft) 0%, transparent 100%);
+  font-weight: 800;
+  font-size: 14px;
+  border-top: 2px solid var(--primary);
+  padding: 12px 20px;
+}
+
+.t-table .t-empty {
+  text-align: center;
+  color: var(--ink-3);
+  padding: 18px 20px;
+  font-style: italic;
+}
+
+@media (max-width: 980px) {
+  .t-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ---------- Professional Reports (Clean) ---------- */
+
+.rpt-wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.rpt-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 24px;
+  background: radial-gradient(1200px 200px at 0% 0%, color-mix(in srgb, var(--primary) 10%, transparent), transparent), var(--grad-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.rpt-title {
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.6px;
+}
+
+.rpt-sub {
+  font-size: 13px;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+
+.rpt-card {
+  background: var(--grad-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+
+.rpt-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.rpt-table thead th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 800;
+  color: var(--ink-3);
+  background: var(--surface-2);
+  padding: 12px 26px;
+  border-bottom: 1px solid var(--border);
+}
+
+.rpt-table thead th.th-right {
+  text-align: right;
+}
+
+.rpt-table tbody td {
+  padding: 10px 26px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.rpt-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--primary-soft) 40%, transparent);
+}
+
+.rpt-table .t-particulars {
+  font-weight: 600;
+}
+
+.rpt-table .t-group {
+  color: var(--ink-3);
+  font-weight: 600;
+}
+
+.rpt-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.rpt-table .rpt-cat td {
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  font-size: 11.5px;
+  padding: 9px 26px;
+}
+
+.rpt-table .rpt-subtotal td {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  font-weight: 800;
+  border-top: 1px solid var(--border);
+}
+
+.rpt-table tfoot .rpt-grand td {
+  background: var(--surface-2);
+  font-weight: 900;
+  font-size: 14px;
+  border-top: 2px solid var(--border-strong);
+  padding: 13px 26px;
+}
+
+.rpt-table tfoot .rpt-diff td {
+  font-weight: 800;
+  color: var(--ink-2);
+  border-top: 1px dashed var(--border-strong);
+}
+
+.rpt-table .rpt-empty {
+  text-align: center;
+  color: var(--ink-3);
+  font-style: italic;
+  padding: 22px 26px;
+}
+
+/* T-Shape */
+.rpt-tshape {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.rpt-tshape thead th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 800;
+  color: var(--ink-3);
+  background: var(--surface-2);
+  padding: 12px 26px;
+  border-bottom: 1px solid var(--border);
+}
+
+.rpt-tshape thead th.th-right {
+  text-align: right;
+}
+
+.rpt-tshape tbody td {
+  padding: 9px 26px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.rpt-tshape tbody td:last-child,
+.rpt-tshape thead th:last-child {
+  border-right: none;
+}
+
+.rpt-tshape .rpt-part {
+  font-weight: 600;
+}
+
+.rpt-tshape .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.rpt-tshape .rpt-side-head td {
+  background: linear-gradient(90deg, var(--primary-soft) 0%, transparent 100%);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-size: 11.5px;
+  padding: 10px 26px;
+}
+
+.rpt-tshape .rpt-cat td {
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  font-size: 11.5px;
+  padding: 9px 26px;
+  border-right: none;
+}
+
+.rpt-tshape .rpt-subtotal td {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  font-weight: 800;
+  border-top: 1px solid var(--border);
+}
+
+.rpt-tshape tfoot .rpt-grand td {
+  background: var(--surface-2);
+  font-weight: 900;
+  font-size: 14px;
+  border-top: 2px solid var(--border-strong);
+  padding: 13px 26px;
+}
+
+.rpt-tshape .rpt-empty {
+  text-align: center;
+  color: var(--ink-3);
+  font-style: italic;
+  padding: 22px 26px;
+  border-right: none;
+}
+
+/* Balance Sheet */
+.rpt-bs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.rpt-bs-panel {
+  background: var(--grad-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.rpt-bs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: linear-gradient(90deg, var(--primary-soft) 0%, transparent 100%);
+  border-bottom: 1px solid var(--border);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-size: 12px;
+}
+
+.rpt-bs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.rpt-bs-table tbody td {
+  padding: 10px 24px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.rpt-bs-table .rpt-part {
+  font-weight: 600;
+}
+
+.rpt-bs-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.rpt-bs-table .rpt-cat td {
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  font-size: 11.5px;
+  padding: 9px 24px;
+}
+
+.rpt-bs-table .rpt-subtotal td {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  font-weight: 800;
+  border-top: 1px solid var(--border);
+}
+
+.rpt-bs-table tfoot .rpt-grand td {
+  background: var(--surface-2);
+  font-weight: 900;
+  font-size: 14px;
+  border-top: 2px solid var(--border-strong);
+  padding: 13px 24px;
+}
+
+.rpt-bs-table .rpt-empty {
+  text-align: center;
+  color: var(--ink-3);
+  font-style: italic;
+  padding: 18px 24px;
+}
+
+/* Cash Flow */
+.rpt-cf-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.rpt-cf-table thead th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 800;
+  color: var(--ink-3);
+  background: var(--surface-2);
+  padding: 12px 26px;
+  border-bottom: 1px solid var(--border);
+}
+
+.rpt-cf-table thead th.th-right {
+  text-align: right;
+}
+
+.rpt-cf-table tbody td {
+  padding: 10px 26px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.rpt-cf-table .rpt-part {
+  font-weight: 600;
+}
+
+.rpt-cf-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.rpt-cf-table .rpt-section td {
+  background: linear-gradient(90deg, var(--primary-soft) 0%, transparent 100%);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-size: 11.5px;
+  padding: 10px 26px;
+}
+
+.rpt-cf-table .rpt-subtotal td {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  font-weight: 800;
+  border-top: 1px solid var(--border);
+}
+
+.rpt-cf-table tfoot .rpt-grand td {
+  background: var(--surface-2);
+  font-weight: 900;
+  font-size: 14px;
+  border-top: 2px solid var(--border-strong);
+  padding: 13px 26px;
+}
+
+.rpt-cf-table .rpt-empty {
+  text-align: center;
+  color: var(--ink-3);
+  font-style: italic;
+  padding: 22px 26px;
+}
+
+@media (max-width: 1080px) {
+  .rpt-bs-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Sticky report footers */
+.rpt-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.rpt-card table {
+  flex: 1 1 auto;
+}
+
+.rpt-card thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.rpt-card tfoot tr {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+}
+
+.rpt-table tfoot tr,
+.rpt-tshape tfoot tr,
+.rpt-cf-table tfoot tr,
+.rpt-bs-table tfoot tr {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.rpt-bs-panel {
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.rpt-bs-panel table {
+  flex: 1 1 auto;
+}
+
+.rpt-bs-panel thead,
+.rpt-bs-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.rpt-bs-panel tfoot tr {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+}
+
+.rpt-wrap {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.rpt-wrap::-webkit-scrollbar {
+  width: 8px;
+}
+
+.rpt-wrap::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--primary) 35%, var(--border));
+  border-radius: 999px;
+}

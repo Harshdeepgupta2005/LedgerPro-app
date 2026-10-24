@@ -64,8 +64,10 @@ const Store = {
 
   rebuildSeqs() {
     for (const a of this.db.accounts) normalizeAccount(a);
-    const vMax = Math.max(0, ...this.db.vouchers.map((x) => leadingNumber(x.id)));
-    const aMax = Math.max(0, ...this.db.accounts.map((x) => leadingNumber(x.id)));
+    let vMax = 0;
+    for (const v of this.db.vouchers) vMax = Math.max(vMax, leadingNumber(v.id));
+    let aMax = 0;
+    for (const a of this.db.accounts) aMax = Math.max(aMax, leadingNumber(a.id));
     this.db.seqs = {
       voucher: Math.max(this.db.seqs && this.db.seqs.voucher ? this.db.seqs.voucher : 0, vMax),
       account: Math.max(this.db.seqs && this.db.seqs.account ? this.db.seqs.account : 0, aMax),
@@ -163,16 +165,26 @@ const Store = {
       clearTimeout(this._flushTimer);
       this._flushTimer = null;
     }
+    if (this._flushing) {
+      // Wait for the in-flight write, then persist anything queued since it began.
+      return this._flushing.then(() => (this._dirty ? this.flushNow() : true));
+    }
     if (!this._dirty) return Promise.resolve(true);
     this._dirty = false;
+    const doc = this.db;
+    const finish = (ok) => {
+      this._flushing = null;
+      // Changes queued while this write was in flight get their own pass.
+      return this._dirty ? this.flushNow() : ok;
+    };
     if (this.hasDiskBackend() && !this._diskBlocked) {
       const persistFailed = () => {
         this.backend = 'localstorage';
         this.warn('Could not write to the database — changes are being kept in browser storage.', 'error');
-        return writeBackup(this.db);
+        return writeBackup(doc);
       };
-      return window.ledger
-        .dbSave(this.db)
+      this._flushing = window.ledger
+        .dbSave(doc)
         .then((res) => {
           if (res && res.ok) {
             clearBackup();
@@ -181,25 +193,17 @@ const Store = {
           }
           return persistFailed();
         })
-        .catch(persistFailed);
+        .catch(persistFailed)
+        .then(finish);
+      return this._flushing;
     }
     this.backend = 'localstorage';
-    return Promise.resolve(writeBackup(this.db));
+    this._flushing = Promise.resolve(writeBackup(doc)).then(finish);
+    return this._flushing;
   },
 
   reset() {
     this.db = seedSampleData();
-    this.rebuildSeqs();
-    this.save();
-    return this.db;
-  },
-
-  clear() {
-    this.db = {
-      accounts: [],
-      vouchers: [],
-      seqs: { voucher: this.seqs.voucher, account: this.seqs.account },
-    };
     this.rebuildSeqs();
     this.save();
     return this.db;
@@ -237,9 +241,7 @@ const Store = {
   },
 
   renumberAll() {
-    const sorted = [...this.db.vouchers].sort(
-      (a, b) => a.date.localeCompare(b.date) || String(a.id).localeCompare(String(b.id))
-    );
+    const sorted = [...this.db.vouchers].sort(compareVoucherOrder);
     const counters = {};
     for (const v of sorted) {
       const prefix = voucherNumberPrefix(v.type);
@@ -252,7 +254,7 @@ const Store = {
 
   addVoucher(v) {
     this.db.vouchers.push(v);
-    this.db.vouchers.sort((a, b) => a.date.localeCompare(b.date));
+    this.db.vouchers.sort(compareVoucherOrder);
     this.save();
   },
 
@@ -277,7 +279,7 @@ const Store = {
     const v = this.db.vouchers.find((x) => x.id === id);
     if (!v) return;
     Object.assign(v, patch);
-    this.db.vouchers.sort((a, b) => a.date.localeCompare(b.date));
+    this.db.vouchers.sort(compareVoucherOrder);
     this.save();
   },
 
@@ -286,14 +288,17 @@ const Store = {
     this.db.vouchers = this.db.vouchers.filter((v) => v.dr !== id && v.cr !== id);
     this.save();
   },
-
-  updateOpenings(map) {
-    for (const a of this.db.accounts) {
-      if (map[a.id] !== undefined) a.opening = map[a.id];
-    }
-    this.save();
-  },
 };
+
+// Canonical voucher ordering: date, then recording time, then numeric id.
+// Used by the store and the renderer so same-date rows don't reorder on reload.
+function compareVoucherOrder(a, b) {
+  return (
+    String(a.date).localeCompare(String(b.date)) ||
+    String(a.createdAt || '').localeCompare(String(b.createdAt || '')) ||
+    leadingNumber(a.id) - leadingNumber(b.id)
+  );
+}
 
 function isoDate(monthsBack, day) {
   const now = new Date();
@@ -439,7 +444,9 @@ function seedSampleData() {
     return {
       id: 'v' + (i + 1),
       no: `${prefix}-${String(counters[v.type]).padStart(4, '0')}`,
-      createdAt: new Date(Date.UTC(2026, 0, 1 + i)).toISOString(),
+      createdAt: new Date(
+        new Date(`${v.date}T09:00:00`).getTime() + i * 60000
+      ).toISOString(),
       ...v,
     };
   });
