@@ -337,7 +337,7 @@ app.whenReady().then(async () => {
       if (tr.hasAttribute('data-total-cfo')) break;
       const numEl = tr.querySelector('td.num');
       if (!numEl) continue;
-      const s = numEl.textContent.replace(/[₹,\s]/g, '').replace(/−/g, '-');
+      const s = numEl.textContent.replace(/[₹,\\s]/g, '').replace(/−/g, '-');
       cfDailySum += parseFloat(s) || 0;
     }
     collect('cf.uiDailySum', +cfDailySum.toFixed(2), cfo, 0.005);
