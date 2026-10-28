@@ -184,7 +184,7 @@ app.whenReady().then(async () => {
       showView('register');
       const tr = Array.from(document.querySelectorAll('#registerTable tbody tr'))
         .find((r) => r.querySelector('.mono') && r.querySelector('.mono').textContent.trim() === sv.no);
-      out.ui.timeShown = !!tr && /[0-9]{1,2}:[0-9]{2}/.test(tr.querySelectorAll('td')[1].textContent.trim());
+      out.ui.timeHidden = !!tr && !/[0-9]{1,2}:[0-9]{2}/.test(tr.querySelectorAll('td')[1].textContent.trim());
 
       (function () {
         const exp = { assets: 0, liab: 0, inc: 0, expn: 0 };
@@ -425,7 +425,7 @@ out.ui.rowsNav = { rowCount, hl, any: hl === 1 && rowCount >= 2 };
   if (!u.voucherSaved) failures.push('voucher could not be saved in smoke');
   if (!u.timeStored) failures.push('voucher recording time (createdAt) not stored');
   if (u.voucherCount !== info.vouchers) failures.push(`voucher count ${u.voucherCount} != ${info.vouchers}`);
-  if (!u.timeShown) failures.push('recording time not shown in voucher register');
+  if (!u.timeHidden) failures.push('recording time still shown in voucher register');
 
   if (u.dateModalOpened !== true) failures.push('F2 did not open the booking-date popup');
   else {
@@ -478,7 +478,7 @@ out.ui.rowsNav = { rowCount, hl, any: hl === 1 && rowCount >= 2 };
     failures.push(`register period sub '${u.registerPeriodSub}'`);
   if (u.registerAllRows !== 0 + info.vouchers)
     failures.push(`register all rows ${u.registerAllRows} != ${info.vouchers}`);
-  if (u.registerAllSub !== 'Every entry, newest first')
+  if (u.registerAllSub !== 'Every entry · newest first')
     failures.push(`register all sub '${u.registerAllSub}'`);
   if (u.navLetters !== 'dashboard') failures.push(`letter nav ended at '${u.navLetters}'`);
   if (u.resultsShown !== true) failures.push('global search results did not open');

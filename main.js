@@ -35,6 +35,11 @@ function flushRenderer(win) {
   return flushing;
 }
 
+// Window base color (compositor clear color). Also what Chromium paints into
+// the page-margin strip during printToPDF — promptAndWrite temporarily swaps
+// it to white so PDF exports keep white margins in every theme.
+const WINDOW_BG = '#0f172a';
+
 // macOS keeps the inset traffic lights; Windows uses a hidden title bar with the
 // native window controls drawn as an overlay in the top bar; Linux keeps its
 // native frame. The renderer re-colours the Windows overlay on theme changes.
@@ -57,7 +62,7 @@ function createWindow() {
     minHeight: 640,
     show: false,
     ...titleBarOptions(),
-    backgroundColor: '#0f172a',
+    backgroundColor: WINDOW_BG,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -179,7 +184,21 @@ async function promptAndWrite(event, { title, defaultName, filters, content, pdf
       filters: Array.isArray(filters) && filters.length ? filters : undefined,
     });
     if (canceled || !filePath) return { ok: false, canceled: true };
-    const data = pdfOptions ? await win.webContents.printToPDF(pdfOptions) : String(content ?? '');
+    let data;
+    if (pdfOptions) {
+      // Chromium paints the page-margin strip (and footer band) with the
+      // window's background color — the app window is dark navy, which turned
+      // every PDF's margins into a wide dark border. Print on a white base,
+      // then restore.
+      win.setBackgroundColor('#ffffff');
+      try {
+        data = await win.webContents.printToPDF(pdfOptions);
+      } finally {
+        win.setBackgroundColor(WINDOW_BG);
+      }
+    } else {
+      data = String(content ?? '');
+    }
     await fs.promises.writeFile(filePath, data, pdfOptions ? undefined : 'utf8');
     return { ok: true, path: filePath };
   } catch (e) {
@@ -196,7 +215,22 @@ ipcMain.handle('export:pdf', (event, { defaultName }) =>
     title: 'Export PDF',
     defaultName,
     filters: [{ name: 'PDF', extensions: ['pdf'] }],
-    pdfOptions: { printBackground: true, pageSize: 'A4' },
+    pdfOptions: {
+      printBackground: true,
+      pageSize: 'A4',
+      // ~10px page margins (10/96in); the content then sits inside a thin
+      // per-page frame (see .pl-frame) with 15px padding. The bottom margin
+      // is deeper so the page-number footer has its own strip outside the
+      // frame.
+      margins: { top: 0.105, bottom: 0.3, left: 0.105, right: 0.105 },
+      displayHeaderFooter: true,
+      headerTemplate: '<div></div>',
+      footerTemplate:
+        '<div style="font-family:-apple-system,\'Segoe UI\',Roboto,sans-serif;font-size:8px;width:100%;padding:0 12px;color:#6b7280;">' +
+        '<span style="float:left;">LedgerPro · Computer-generated ledger</span>' +
+        '<span style="float:right;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>' +
+        '</div>',
+    },
   })
 );
 

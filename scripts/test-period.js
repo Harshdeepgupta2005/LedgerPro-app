@@ -242,7 +242,7 @@ const EV = {
       const el = document.querySelector('[data-total-diff]');
       return el ? el.getAttribute('data-total-diff') : null;
     })()`,
-  sub: `(() => { const el = document.querySelector('#reportBody .rpt-sub'); return el ? el.textContent : ''; })()`,
+  sub: `(() => { const el = document.querySelector('#reportSub'); return el ? el.textContent : ''; })()`,
   cards: `(() => {
       const out = {};
       for (const k of ['income', 'expense', 'net', 'liquid', 'liquidity']) {
@@ -306,10 +306,10 @@ app.whenReady().then(async () => {
     const t1 = trialExpect(null);
     collect('phase1.trial.dr', await data('dr'), t1.dr);
     collect('phase1.trial.cr', await data('cr'), t1.cr);
-    const b1 = parseFloat(await got(EV.banner));
+    const b1raw = await got(EV.banner);
     if (Math.abs(openImb) <= diffTol)
-      collectTrue('phase1.trial.noBanner', b1 == null, 'banner absent on balanced book');
-    else collect('phase1.trial.bannerDiff', b1, openImb, diffTol);
+      collectTrue('phase1.trial.noBanner', b1raw == null, `balanced book, got banner=${b1raw}`);
+    else collect('phase1.trial.bannerDiff', parseFloat(b1raw), openImb, diffTol);
     const label1 = JSON.parse(await got(EV.periodSnapshot));
     collectTrue('phase1.label.allTime', label1.label === 'All time', label1.label);
 
@@ -344,7 +344,10 @@ app.whenReady().then(async () => {
     const t3 = trialExpect(T3);
     collect('phase3.trial.dr', await data('dr'), t3.dr);
     collect('phase3.trial.cr', await data('cr'), t3.cr);
-    collect('phase3.trial.bannerDiff', parseFloat(await got(EV.banner)), openImb, diffTol);
+    const t3rawBanner = await got(EV.banner);
+    if (Math.abs(openImb) <= diffTol)
+      collectTrue('phase3.trial.noBanner', t3rawBanner == null, `balanced book, got banner=${t3rawBanner}`);
+    else collect('phase3.trial.bannerDiff', parseFloat(t3rawBanner), openImb, diffTol);
     const sub3 = await got(EV.sub);
     collectTrue('phase3.trial.asOfLabel', sub3.includes('Sep'), sub3);
 
@@ -467,7 +470,10 @@ app.whenReady().then(async () => {
     // period end (openings + every voucher ≤ to), NOT the window P&L the P&L
     // report prints — pre-September results stay in retained earnings.
     collect('phase3.bs.plRow', parseFloat(await got(readDataExpr('net'))), plExpect(null, T3).net, 0.005);
-    collect('phase3.bs.bannerDiff', parseFloat(await got(EV.banner)), openImb, diffTol);
+    const bsRawBanner3 = await got(EV.banner);
+    if (Math.abs(openImb) <= diffTol)
+      collectTrue('phase3.bs.noBanner', bsRawBanner3 == null, `balanced book, got banner=${bsRawBanner3}`);
+    else collect('phase3.bs.bannerDiff', parseFloat(bsRawBanner3), openImb, diffTol);
 
     // Cash Flow — exact window through ledger-core
     await got(["(() => { showView('reports', { record: false }); openReport('cashflow'); return 'ok'; })()"]);
@@ -499,8 +505,8 @@ app.whenReady().then(async () => {
     collectTrue(
       'phase3.cf.twoPanels',
       cfStruct.bars === 2 &&
-        /Net Change/.test(cfStruct.labels[0]) &&
-        /Cash at Close/.test(cfStruct.labels[1]),
+        /Total Change in Cash/.test(cfStruct.labels[0]) &&
+        /Total Cash/.test(cfStruct.labels[1]),
       JSON.stringify(cfStruct.labels)
     );
     collectTrue(
@@ -514,6 +520,24 @@ app.whenReady().then(async () => {
       await data('cash-close'),
       0.005
     );
+    // Printed-lines contract: the profit row plus every daily detail line
+    // PRINTED above the daily total must add up to that total — every figure
+    // on the statement must be verifiable from what is shown.
+    const cfDaily = parseFloat(
+      await got(`(() => {
+        const panel = document.querySelector('.rpt-bs-panel');
+        let sum = 0;
+        for (const tr of [...panel.querySelectorAll('tbody tr')]) {
+          if (tr.hasAttribute('data-total-cfo')) break;
+          const numEl = tr.querySelector('td.num');
+          if (!numEl) continue;
+          const s = numEl.textContent.replace(/[₹,\\s]/g, '').replace(/−/g, '-');
+          sum += parseFloat(s) || 0;
+        }
+        return sum.toFixed(2);
+      })()`)
+    );
+    collect('phase3.cf.uiDailySum', cfDaily, cf3.cf.cfo, 0.005);
 
     // Dashboard with the period
     await got(["(() => { showView('dashboard', { record: false }); return 'ok'; })()"]);
@@ -576,7 +600,10 @@ app.whenReady().then(async () => {
     if (Math.abs(p6.net) <= 0.005) collectTrue('phase6.pl.noNetRow', net6 == null, String(net6));
     else collect('phase6.pl.net', parseFloat(net6), p6.net);
     await got(["(() => { showView('reports', { record: false }); openReport('balance'); return 'ok'; })()"]);
-    collect('phase6.bs.bannerDiff', parseFloat(await got(EV.banner)), openImb, diffTol);
+    const bsRawBanner6 = await got(EV.banner);
+    if (Math.abs(openImb) <= diffTol)
+      collectTrue('phase6.bs.noBanner', bsRawBanner6 == null, `balanced book, got banner=${bsRawBanner6}`);
+    else collect('phase6.bs.bannerDiff', parseFloat(bsRawBanner6), openImb, diffTol);
     await got(["(() => { showView('reports', { record: false }); openReport('cashflow'); return 'ok'; })()"]);
     const cf6 = cfExpect(F6, T6);
     collect('phase6.cf.net', await data('netcash'), cf6.cf.netCash, 0.005);

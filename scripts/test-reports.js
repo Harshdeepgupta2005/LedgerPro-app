@@ -328,6 +328,19 @@ app.whenReady().then(async () => {
     );
     const cfBars = [...document.querySelectorAll('.rpt-bs-totals')];
     collect('cf.panelBars', cfBars.length, 2);
+    // User-facing arithmetic contract: every amount PRINTED above the daily
+    // total (the profit row + each working-capital detail row) must add up to
+    // that total — no printed figure may be unverifiable from what is shown.
+    const cfPanel = document.querySelector('.rpt-bs-panel');
+    let cfDailySum = 0;
+    for (const tr of [...cfPanel.querySelectorAll('tbody tr')]) {
+      if (tr.hasAttribute('data-total-cfo')) break;
+      const numEl = tr.querySelector('td.num');
+      if (!numEl) continue;
+      const s = numEl.textContent.replace(/[₹,\s]/g, '').replace(/−/g, '-');
+      cfDailySum += parseFloat(s) || 0;
+    }
+    collect('cf.uiDailySum', +cfDailySum.toFixed(2), cfo, 0.005);
     out.expected.cfo = +cfo.toFixed(2);
     out.expected.cfi = +cfi.toFixed(2);
     out.expected.cff = +cff.toFixed(2);

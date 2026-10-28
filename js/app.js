@@ -2,7 +2,7 @@ const PAGE_META = {
   dashboard: { title: 'Dashboard', sub: 'Overview of your books' },
   vouchers: { title: 'Voucher Entry', sub: 'Pick a type, enter both sides, save and continue' },
   accounts: { title: 'Accounts', sub: 'Groups, types and editable ledgers' },
-  register: { title: 'Voucher Register', sub: 'Every entry, newest first, with the time it was recorded' },
+  register: { title: 'Voucher Register', sub: 'Every entry, newest first' },
   reports: { title: 'Reports', sub: 'Choose a statement, then view it' },
   settings: { title: 'Settings', sub: 'Preferences and local data' },
 };

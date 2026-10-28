@@ -971,6 +971,20 @@ textarea {
   border-radius: 8px;
 }
 
+/* The chart card shares the grid row with the Recent Vouchers card, which is
+   usually taller — stretch the chart to fill the card instead of leaving dead
+   space under the baseline. */
+.chart-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-card .chart {
+  flex: 1;
+  min-height: 220px;
+  height: auto;
+}
+
 .chart-group {
   flex: 1;
   display: flex;
@@ -2253,12 +2267,21 @@ tr[data-ledger] {
 @media print {
   @page {
     size: A4;
-    margin: 14mm 12mm;
+    /* Margins deliberately come from the printToPDF options (they reserve the
+       strip the page-number footer is drawn into); declaring them here would
+       override those values and crash content into the footer. */
   }
 
   html,
   body {
     background: #fff !important;
+  }
+
+  /* The app's dark theme sets color-scheme:dark on <html>; in print Chromium
+     paints the page margins with that scheme's canvas color — a dark band
+     around every page. Print always uses the light scheme. */
+  html {
+    color-scheme: light !important;
   }
 
   body > *:not(#printLedger) {
@@ -2268,41 +2291,159 @@ tr[data-ledger] {
   #printLedger {
     display: block;
     background: #fff;
-    color: #111;
+    color: #111827;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 11px;
+    padding: 15px; /* inside the page frame */
   }
 
-  .pl-head h1 {
-    margin: 0 0 4px;
-    font-size: 20px;
-    letter-spacing: -0.3px;
+  /* Thin frame around the report on EVERY page: position:fixed elements are
+     repainted on each printed page in Chromium (a regular border would only
+     wrap the document's first/last corners). The margins passed to
+     printToPDF put this 10px from the page edge. */
+  .pl-frame {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    border: 2px solid #cbd5e1;
+    pointer-events: none;
   }
 
-  .pl-head p {
-    margin: 2px 0;
-    font-size: 11.5px;
-    color: #444;
+  /* Brand row: LedgerPro wordmark left, document type right */
+  .pl-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #4f46e5;
   }
 
-  .pl-head .pl-date {
-    color: #777;
+  .pl-brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+  }
+
+  .pl-brand img {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+  }
+
+  .pl-tag {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 3px 8px;
+  }
+
+  /* Account name as the document's headline */
+  .pl-account {
+    margin: 14px 0 0;
+    font-size: 23px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #0b1226;
+  }
+
+  .pl-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr 0.65fr 1fr;
+    gap: 14px;
+    margin-top: 10px;
+    padding: 9px 0;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .pl-meta div {
+    font-size: 10px;
+  }
+
+  .pl-meta span {
+    display: block;
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 2px;
+  }
+
+  .pl-meta strong {
+    font-size: 11px;
+    font-weight: 650;
+    color: #111827;
+  }
+
+  /* Summary band: four boxed figures */
+  .pl-summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin: 12px 0 14px;
+  }
+
+  .pl-sum {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 9px 11px;
+  }
+
+  .pl-sum--close {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+  }
+
+  .pl-sum span {
+    display: block;
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 3px;
+  }
+
+  .pl-sum strong {
+    font-size: 13.5px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: #111827;
   }
 
   .pl-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 14px;
-    font-size: 11.5px;
+    font-size: 10.5px;
+  }
+
+  .pl-table thead {
+    display: table-header-group; /* repeat on every page */
+  }
+
+  .pl-table tr {
+    page-break-inside: avoid;
   }
 
   .pl-table th {
     text-align: left;
-    font-size: 10.5px;
+    font-size: 9px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: #555;
-    border-bottom: 1.5px solid #333;
-    padding: 7px 8px;
+    letter-spacing: 0.7px;
+    color: #6b7280;
+    border-bottom: 1.5px solid #111827;
+    padding: 6px 7px;
   }
 
   .pl-table th.num {
@@ -2310,28 +2451,76 @@ tr[data-ledger] {
   }
 
   .pl-table td {
-    padding: 6px 8px;
-    border-bottom: 1px solid #e2e5ea;
+    padding: 5.5px 7px;
+    border-bottom: 1px solid #e5e7eb;
     vertical-align: top;
+  }
+
+  .pl-table td:first-child {
+    white-space: nowrap;
+  }
+
+  .pl-table tbody tr:nth-child(even) td {
+    background: #f8f9fb;
   }
 
   .pl-table .num {
     text-align: right;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
-  .pl-table .pl-sub {
-    display: block;
-    font-size: 10px;
-    color: #777;
-    margin-top: 1px;
+  .pl-table .mono {
+    font-family: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 9.5px;
+    color: #374151;
   }
 
   .pl-table .pl-strong td {
     font-weight: 700;
-    background: #f4f5f7;
-    border-top: 1.5px solid #333;
-    border-bottom: none;
+    background: #f3f4f6 !important;
+    -webkit-print-color-adjust: exact;
+    border-top: 1px solid #9ca3af;
+    border-bottom: 1.5px solid #111827;
+  }
+
+  .pl-empty {
+    text-align: center;
+    color: #6b7280;
+    font-style: italic;
+    padding: 18px 8px;
+  }
+
+  .pl-footer {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #d1d5db;
+    font-size: 9px;
+    color: #6b7280;
+  }
+
+  /* Column proportions: dates/numbers narrow, prose wide */
+  .pl-table .c-date {
+    width: 10.5%;
+  }
+  .pl-table .c-no {
+    width: 9%;
+  }
+  .pl-table .c-type {
+    width: 7.5%;
+  }
+  .pl-table .c-part {
+    width: 16%;
+  }
+  .pl-table .c-narr {
+    width: 25%;
+  }
+  .pl-table .c-num {
+    width: 10.7%;
+  }
+
+  .text-red {
+    color: #b42318;
   }
 }
 
@@ -2339,7 +2528,7 @@ tr[data-ledger] {
 
 .report-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 14px;
 }
 
@@ -2959,31 +3148,6 @@ body {
   gap: 18px;
 }
 
-.rpt-header {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 18px 24px;
-  background:
-    radial-gradient(1200px 200px at 0% 0%, color-mix(in srgb, var(--primary) 10%, transparent), transparent),
-    var(--grad-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-
-.rpt-title {
-  font-size: 20px;
-  font-weight: 900;
-  letter-spacing: -0.6px;
-}
-
-.rpt-sub {
-  font-size: 13px;
-  color: var(--ink-3);
-  font-weight: 600;
-}
-
 .rpt-card {
   background: var(--grad-surface);
   border: 1px solid var(--border);
@@ -3211,8 +3375,6 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  overflow-x: hidden;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -3274,74 +3436,8 @@ body {
   padding: 18px 24px;
 }
 
-/* Cash Flow */
-.rpt-cf-table {
-  width: 100%;
-  min-width: 720px;
-  border-collapse: collapse;
-  font-size: 13.5px;
-}
-
-.rpt-cf-table thead th {
-  text-align: left;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  font-weight: 800;
-  color: var(--ink-3);
-  background: var(--surface-2);
-  padding: 12px 26px;
-  border-bottom: 1px solid var(--border);
-}
-
-.rpt-cf-table thead th.th-right {
-  text-align: right;
-}
-
-.rpt-cf-table tbody td {
-  padding: 10px 26px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-}
-
-.rpt-cf-table .rpt-part {
-  font-weight: 600;
-}
-
-.rpt-cf-table .num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
-.rpt-cf-table .rpt-section td {
-  background: linear-gradient(90deg, var(--primary-soft) 0%, transparent 100%);
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  font-size: 11.5px;
-  padding: 10px 26px;
-}
-
-.rpt-cf-table .rpt-subtotal td {
-  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
-  font-weight: 800;
-  border-top: 1px solid var(--border);
-}
-
-.rpt-cf-table tfoot .rpt-grand td {
-  background: var(--surface-2);
-  font-weight: 900;
-  font-size: 14px;
-  border-top: 2px solid var(--border-strong);
-  padding: 13px 26px;
-}
-
-.rpt-cf-table .rpt-empty {
-  text-align: center;
-  color: var(--ink-3);
-  font-style: italic;
-  padding: 22px 26px;
-}
+/* Cash Flow renders through the shared .rpt-bs-table family (no table-css of
+   its own any more). */
 
 @media (max-width: 1080px) {
   .rpt-bs-grid {
@@ -3365,21 +3461,12 @@ body {
   z-index: 2;
 }
 
-.rpt-card tfoot tr {
-  position: sticky;
-  bottom: 0;
-  z-index: 3;
-}
-
-.rpt-table tfoot tr,
-.rpt-tshape tfoot tr,
-.rpt-cf-table tfoot tr {
+.rpt-table tfoot tr {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
 .rpt-bs-panel {
-  max-height: 70vh;
   display: flex;
   flex-direction: column;
 }
@@ -3398,12 +3485,11 @@ body {
   z-index: 2;
 }
 
-/* Pinned totals bar of a Balance-Sheet-style panel (used by both the Balance
-   Sheet and the two-panel P&L). Occupies the panel's bottom edge at natural
-   height — margin-top: auto absorbs whatever space the stretched panel has —
-   and stays visible while the table scrolls (sticky bottom). This is the same
-   "total fixed at the bottom" behaviour as the Trial Balance, achieved without
-   giving the table a definite height, which is what inflated row heights. */
+/* Totals bar of a Balance-Sheet-style panel (used by the Balance Sheet, the
+   two-panel P&L and the Cash Flow). Occupies the panel's bottom edge —
+   margin-top: auto absorbs whatever space the stretched share of the grid has,
+   so both sides of a statement share one baseline. Reports do not scroll
+   internally, so the bar always sits right where its figures end. */
 .rpt-bs-totals {
   display: flex;
   align-items: baseline;
@@ -3415,9 +3501,6 @@ body {
   padding: 13px 26px;
   font-weight: 900;
   font-size: 14px;
-  position: sticky;
-  bottom: 0;
-  z-index: 3;
 }
 
 .rpt-bs-totals .num {
@@ -3425,16 +3508,7 @@ body {
 }
 
 .rpt-wrap {
-  max-height: calc(100vh - 220px);
-  overflow-y: auto;
-  padding-right: 6px;
-}
-
-.rpt-wrap::-webkit-scrollbar {
-  width: 8px;
-}
-
-.rpt-wrap::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--primary) 35%, var(--border));
-  border-radius: 999px;
+  /* Reports have NO internal scrolling: they lay out to their natural height
+     and the page itself scrolls. Totals bars remain pinned while it does. */
+  padding-right: 2px;
 }

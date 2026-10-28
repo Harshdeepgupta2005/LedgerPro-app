@@ -2,6 +2,40 @@
 
 All notable changes to LedgerPro are documented here. Semantic versioning.
 
+## [1.7.0] - 2026-10-28
+
+### Changed
+
+- **Export PDF redesigned**: LedgerPro brand row, account name as the headline,
+  meta strip (group/type, period, entries, generated on) and a four-box summary
+  band (opening, total debits, total credits, highlighted closing balance);
+  zebra-striped rows, repeated table head on every page and a footer note
+  showing the identity "Opening + Debits − Credits = Closing"
+- PDF page furniture: real page margins, a thin frame 10px from the page edge
+  with 15px inner padding on every page, and a footer with "LedgerPro ·
+  Computer-generated ledger" and "Page N of M"
+- Print uses a white compositor base: the app's dark window background no
+  longer bleeds into the PDF margins as a wide dark border, in any theme
+- **Voucher Register no longer shows the recording time** (the timestamp is
+  still stored internally); the card has a single heading and its sub-line now
+  surfaces a hidden global-search filter (`Filtered by "…" · … · newest
+first`) instead of silently shrinking the list
+- Dashboard chart stretches to fill its card (previously dead space below the
+  baseline when the Recent Vouchers card was taller)
+- Reports picker lays out as one balanced row of cards and no longer repeats
+  the section heading
+
+### Fixed
+
+- Closing Balance row no longer repeats on every printed PDF page (it lived in
+  `<tfoot>`, which Chromium repeats; it is now the last `<tbody>` row)
+- The printed header, summary band and footer are fully styled (the `pl-*`
+  print classes previously had no CSS at all)
+- Ledger PDF date column no longer wraps ("01 Oct / 2026")
+- Script bookkeeping: report suites now accept a balanced book (no imbalance
+  banner) instead of failing on `parseFloat(null)`; smoke asserts the register
+  hides the recording time
+
 ## [1.6.0] - 2026-10-10
 
 ### Added

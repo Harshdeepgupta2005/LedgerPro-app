@@ -968,39 +968,51 @@ function fillPrintLedger(a) {
     minute: '2-digit',
   });
   const periodStr = state.period ? periodLabel() : 'All time';
+  const totalDr = data.reduce((s, x) => s + (x.isDebit ? x.v.amount : 0), 0);
+  const totalCr = data.reduce((s, x) => s + (x.isDebit ? 0 : x.v.amount), 0);
   $('#printLedger').innerHTML = `
+    <div class="pl-frame" aria-hidden="true"></div>
     <div class="pl-head">
       <div class="pl-brand">
-        <img src="assets/icon-256.png" alt="LedgerPro" />
-        <div>
-          <h1>Ledger Account</h1>
-          <p class="pl-app">LedgerPro</p>
-        </div>
+        <img src="assets/icon-256.png" alt="" />
+        <span>LedgerPro</span>
       </div>
-      <div class="pl-meta">
-        <div><span>Account Name</span><strong>${esc(a.name)}</strong></div>
-        <div><span>Group / Type</span><strong>${esc(a.group)} · ${esc(a.type)}</strong></div>
-        <div><span>Period</span><strong>${esc(periodStr)}</strong></div>
-        <div><span>Generated On</span><strong>${esc(generated)}</strong></div>
-      </div>
+      <div class="pl-tag">Account Ledger</div>
+    </div>
+    <h1 class="pl-account">${esc(a.name)}</h1>
+    <div class="pl-meta">
+      <div><span>Group / Type</span><strong>${esc(a.group)} · ${esc(a.type)}</strong></div>
+      <div><span>Period</span><strong>${esc(periodStr)}</strong></div>
+      <div><span>Entries</span><strong>${data.length}</strong></div>
+      <div><span>Generated on</span><strong>${esc(generated)}</strong></div>
     </div>
     <div class="pl-summary">
       <div class="pl-sum"><span>Opening Balance</span><strong>${fmt(opening)}</strong></div>
-      <div class="pl-sum"><span>Total Debits</span><strong>${fmt(data.reduce((s, x) => s + (x.isDebit ? x.v.amount : 0), 0))}</strong></div>
-      <div class="pl-sum"><span>Total Credits</span><strong>${fmt(data.reduce((s, x) => s + (x.isDebit ? 0 : x.v.amount), 0))}</strong></div>
-      <div class="pl-sum pl-sum--close"><span>Closing Balance</span><strong>${fmt(closing)}</strong></div>
+      <div class="pl-sum"><span>Total Debits</span><strong>${fmt(totalDr)}</strong></div>
+      <div class="pl-sum"><span>Total Credits</span><strong>${fmt(totalCr)}</strong></div>
+      <div class="pl-sum pl-sum--close"><span>Closing Balance</span><strong class="${closing < 0 ? 'text-red' : ''}">${fmt(closing)}</strong></div>
     </div>
     <table class="pl-table">
+      <colgroup>
+        <col class="c-date" />
+        <col class="c-no" />
+        <col class="c-type" />
+        <col class="c-part" />
+        <col class="c-narr" />
+        <col class="c-num" />
+        <col class="c-num" />
+        <col class="c-num" />
+      </colgroup>
       <thead>
         <tr>
           <th scope="col">Date</th>
           <th scope="col">Voucher No.</th>
-          <th scope="col">Voucher Type</th>
+          <th scope="col">Type</th>
           <th scope="col">Particulars</th>
           <th scope="col">Narration</th>
-          <th class="num" scope="col">Debit (₹)</th>
-          <th class="num" scope="col">Credit (₹)</th>
-          <th class="num" scope="col">Balance (₹)</th>
+          <th class="num" scope="col">Debit</th>
+          <th class="num" scope="col">Credit</th>
+          <th class="num" scope="col">Balance</th>
         </tr>
       </thead>
       <tbody>
@@ -1024,12 +1036,13 @@ function fillPrintLedger(a) {
                 .join('')
             : '<tr><td colspan="8" class="pl-empty">No transactions in this period.</td></tr>'
         }
+        <tr class="pl-strong"><td colspan="7">Closing Balance</td><td class="num ${closing < 0 ? 'text-red' : ''}">${fmt(closing)}</td></tr>
       </tbody>
-      <tfoot>
-        <tr class="pl-strong"><td colspan="7">Closing Balance</td><td class="num">${fmt(closing)}</td></tr>
-      </tfoot>
     </table>
-    <div class="pl-footer">This is a computer-generated ledger from LedgerPro.</div>`;
+    <div class="pl-footer">
+      Computer-generated ledger from LedgerPro · Opening + Debits − Credits = Closing.
+      Amounts are computed from recorded vouchers.
+    </div>`;
 }
 
 function exportLedgerCSV() {
@@ -1073,7 +1086,7 @@ const REPORT_META = {
   trial: { title: 'Trial Balance', sub: 'Debit and credit balances of every account' },
   pl: { title: 'Profit & Loss Statement', sub: 'Income and expenses for the period' },
   balance: { title: 'Balance Sheet', sub: 'Assets, equity and liabilities as of the end date' },
-  cashflow: { title: 'Cash Flow Statement', sub: 'Operating, investing and financing flows' },
+  cashflow: { title: 'Cash Flow Statement', sub: 'How your cash changed' },
 };
 
 function renderReports() {
@@ -1191,10 +1204,6 @@ function renderTrialBalance() {
   $('#reportBody').innerHTML = `
     <div class="rpt-wrap">
       ${tbBanner}
-      <div class="rpt-header">
-        <div class="rpt-title">Trial Balance</div>
-        <div class="rpt-sub">As on ${esc(range ? fmtDate(range.to) : fmtDate(todayISO()))}${state.period ? ` · ${esc(periodLabel())}` : ''}</div>
-      </div>
       <div class="rpt-card">
         <table class="rpt-table">
           <thead>
@@ -1283,10 +1292,6 @@ function renderPLStatement() {
 
   $('#reportBody').innerHTML = `
     <div class="rpt-wrap">
-      <div class="rpt-header">
-        <div class="rpt-title">Profit &amp; Loss</div>
-        <div class="rpt-sub">${esc(periodLabel())}</div>
-      </div>
       <div class="rpt-bs-grid">
         <div class="rpt-bs-panel">
           <div class="rpt-bs-head"><span>Income</span><span>Amount</span></div>
@@ -1380,10 +1385,6 @@ function renderBalanceSheet() {
   $('#reportBody').innerHTML = `
     <div class="rpt-wrap">
       ${bsBanner}
-      <div class="rpt-header">
-        <div class="rpt-title">Balance Sheet</div>
-        <div class="rpt-sub">As on ${esc(range ? fmtDate(range.to) : fmtDate(todayISO()))}</div>
-      </div>
       <div class="rpt-bs-grid">
         <div class="rpt-bs-panel">
           <div class="rpt-bs-head"><span>Liabilities &amp; Equity</span><span>Amount</span></div>
@@ -1430,17 +1431,21 @@ function renderRegister() {
   $('#registerEmpty').hidden = rows.length > 0;
   $('#registerTable').parentElement.hidden = rows.length === 0;
   const sub = $('#registerSub');
-  if (sub) sub.textContent = state.period ? `${periodLabel()} · newest first` : 'Every entry, newest first';
+  if (sub) {
+    // A topbar search silently filters this list while typing elsewhere —
+    // surface it, otherwise rows disappear with no visible reason.
+    const parts = [];
+    if (state.search) parts.push(`Filtered by "${state.search.trim()}"`);
+    parts.push(state.period ? periodLabel() : 'Every entry');
+    sub.textContent = `${parts.join(' · ')} · newest first`;
+  }
 
   tbody.innerHTML = rows
     .map(
       (v) => `
       <tr data-row-voucher="${attr(v.id)}">
         <td class="mono">${esc(v.no)}</td>
-        <td>
-          <span class="cell-title">${fmtDate(v.date)}</span>
-          <span class="cell-sub">${v.createdAt ? fmtTime(v.createdAt) : '—'}</span>
-        </td>
+        <td><span class="cell-title">${fmtDate(v.date)}</span></td>
         <td>${badge(v.type)}</td>
         <td>
           <span class="cell-title">${esc(Store.accountName(v.cr))} → ${esc(Store.accountName(v.dr))}</span>
@@ -1533,16 +1538,18 @@ function renderCashFlowStatementImproved() {
         (l) =>
           `<tr><td class="rpt-part">${esc(l.name)}</td><td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td></tr>`
       )
-      .join('') || '<tr><td colspan="2" class="rpt-empty">No operating activities</td></tr>';
+      .join('') || '<tr><td colspan="2" class="rpt-empty">No entries</td></tr>';
 
-  // Build investing activities rows
+  // Build investing activities rows. The group names are calc-only labels —
+  // nothing technical prints on the statement; every total gets a plain,
+  // everyday description instead.
   const invRows =
     (cf.investing || [])
       .map(
         (l) =>
           `<tr><td class="rpt-part">${esc(l.name)}</td><td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td></tr>`
       )
-      .join('') || '<tr><td colspan="2" class="rpt-empty">No investing activities</td></tr>';
+      .join('') || '<tr><td colspan="2" class="rpt-empty">No entries</td></tr>';
 
   // Build financing activities rows
   const finRows =
@@ -1551,43 +1558,44 @@ function renderCashFlowStatementImproved() {
         (l) =>
           `<tr><td class="rpt-part">${esc(l.name)}</td><td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td></tr>`
       )
-      .join('') || '<tr><td colspan="2" class="rpt-empty">No financing activities</td></tr>';
+      .join('') || '<tr><td colspan="2" class="rpt-empty">No entries</td></tr>';
 
   // Same two-panel format as the Balance Sheet and the P&L: the left panel is
-  // the movement itself (A/B/C activities with their detail lines, ending on a
-  // pinned Net-change bar), the right panel reconciles the position (Opening
-  // → Net change → pinned Closing bar). One figure per hook, once, so the
-  // data-total-* instrumentation of the suites reads exactly what is printed.
+  // the movement itself — the detail lines with each group's plain total after
+  // them (the bold banded total rows act as the separators), and the right
+  // panel reconciles the position (Opening → Net change → Closing bar).
+  // Deliberately free of accounting jargon (no Operating/Investing/Financing
+  // wording, keep it simple and easy).
   $('#reportBody').innerHTML = `
     <div class="rpt-wrap">
-      <div class="rpt-header">
-        <div class="rpt-title">Cash Flow Statement</div>
-        <div class="rpt-sub">For the period ${esc(periodLabel())}</div>
-      </div>
       <div class="rpt-bs-grid">
         <div class="rpt-bs-panel">
           <div class="rpt-bs-head"><span>Cash Movement</span><span>Amount</span></div>
           <table class="rpt-bs-table">
             <tbody>
+              <tr>
+                <td class="rpt-part">Profit from Income &amp; Expenses</td>
+                <td class="num ${cf.netProfit < 0 ? 'text-red' : ''}" data-total-plnet="${num2(cf.netProfit)}">${fmt(cf.netProfit)}</td>
+              </tr>
               ${opRows}
               <tr class="rpt-subtotal" data-total-cfo="${num2(cf.cfo)}">
-                <td>Net Cash from Operating Activities (A)</td>
+                <td>Total from Daily Transactions</td>
                 <td class="num ${cf.cfo < 0 ? 'text-red' : ''}">${fmt(cf.cfo)}</td>
               </tr>
               ${invRows}
               <tr class="rpt-subtotal" data-total-cfi="${num2(cf.cfi)}">
-                <td>Net Cash from Investing Activities (B)</td>
+                <td>Total from Purchases &amp; Deposits</td>
                 <td class="num ${cf.cfi < 0 ? 'text-red' : ''}">${fmt(cf.cfi)}</td>
               </tr>
               ${finRows}
               <tr class="rpt-subtotal" data-total-cff="${num2(cf.cff)}">
-                <td>Net Cash from Financing Activities (C)</td>
+                <td>Total from Loans &amp; Borrowings</td>
                 <td class="num ${cf.cff < 0 ? 'text-red' : ''}">${fmt(cf.cff)}</td>
               </tr>
             </tbody>
           </table>
-          <div class="rpt-bs-totals" data-total-netcash="${num2(cf.netCash)}" title="Operating + Investing + Financing (${fmt(cf.cfo)} ${cf.cfi < 0 ? '−' : '+'} ${fmt(Math.abs(cf.cfi))} ${cf.cff < 0 ? '−' : '+'} ${fmt(Math.abs(cf.cff))})">
-            <span>Net Change in Cash (A+B+C)</span><span class="num ${cf.netCash < 0 ? 'text-red' : ''}">${fmt(cf.netCash)}</span>
+          <div class="rpt-bs-totals" data-total-netcash="${num2(cf.netCash)}" title="Added together: Daily Transactions + Purchases & Deposits + Loans & Borrowings (${fmt(cf.cfo)} ${cf.cfi < 0 ? '−' : '+'} ${fmt(Math.abs(cf.cfi))} ${cf.cff < 0 ? '−' : '+'} ${fmt(Math.abs(cf.cff))})">
+            <span>Total Change in Cash</span><span class="num ${cf.netCash < 0 ? 'text-red' : ''}">${fmt(cf.netCash)}</span>
           </div>
         </div>
         <div class="rpt-bs-panel">
@@ -1599,13 +1607,13 @@ function renderCashFlowStatementImproved() {
                 <td class="num">${fmt(openingCash)}</td>
               </tr>
               <tr>
-                <td class="rpt-part">Net Change in Cash (A+B+C)</td>
+                <td class="rpt-part">Net Change in Cash</td>
                 <td class="num ${cf.netCash < 0 ? 'text-red' : ''}">${fmt(cf.netCash)}</td>
               </tr>
             </tbody>
           </table>
           <div class="rpt-bs-totals" data-total-cash-close="${num2(closingCash)}" title="Opening + Net change (${fmt(openingCash)} + ${fmt(cf.netCash)})">
-            <span>Cash at Close</span><span class="num ${closingCash < 0 ? 'text-red' : ''}">${fmt(closingCash)}</span>
+            <span>Total Cash &amp; Bank (Closing)</span><span class="num ${closingCash < 0 ? 'text-red' : ''}">${fmt(closingCash)}</span>
           </div>
         </div>
       </div>
