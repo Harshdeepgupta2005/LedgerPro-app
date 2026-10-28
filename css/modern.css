@@ -492,10 +492,10 @@ textarea {
 }
 
 .global-results {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
+  /* Body-level <div> positioned fixed by anchorGlobalResults() (views.js):
+     escapes the topbar's backdrop-filter stacking context, so the panel always
+     paints above dashboard cards, the ledger drawer, modals and toasts. */
+  position: fixed;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 12px;
@@ -503,7 +503,7 @@ textarea {
   padding: 6px;
   max-height: 340px;
   overflow-y: auto;
-  z-index: 80;
+  z-index: 3000;
 }
 
 .result-group {
@@ -1343,7 +1343,13 @@ textarea {
 }
 
 .last-saved[hidden] {
-  display: none;
+  /* Keep the chip's slot in the layout (invisible) instead of display:none:
+     .entry-actions is space-between, so a display:none chip would let the
+     Clear / Save buttons sit left until a save appears — then push them right,
+     then snap them back when the chip times out 12 s later. With the slot
+     reserved the action buttons never move, on any breakpoint. */
+  display: flex;
+  visibility: hidden;
 }
 
 .last-saved svg {
@@ -1926,8 +1932,15 @@ tr[data-ledger] {
 .modal-actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 4px;
+}
+
+/* The reporting-period dialog carries five actions (Cancel / This Month /
+   Last Month / All time / Apply Period) — widen it so they fit on one row. */
+#periodModal .modal {
+  width: min(640px, calc(100vw - 48px));
 }
 
 /* ---------- Ledger drawer ---------- */
@@ -2792,7 +2805,6 @@ body {
   background: color-mix(in srgb, var(--surface) 72%, transparent);
 }
 
-
 /* ---------- Professional T-Shaped Reports ---------- */
 
 .t-report {
@@ -2937,7 +2949,6 @@ body {
   }
 }
 
-
 /* ---------- Professional Reports (Clean) ---------- */
 
 .rpt-wrap {
@@ -2953,7 +2964,9 @@ body {
   flex-direction: column;
   gap: 4px;
   padding: 18px 24px;
-  background: radial-gradient(1200px 200px at 0% 0%, color-mix(in srgb, var(--primary) 10%, transparent), transparent), var(--grad-surface);
+  background:
+    radial-gradient(1200px 200px at 0% 0%, color-mix(in srgb, var(--primary) 10%, transparent), transparent),
+    var(--grad-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -3148,11 +3161,49 @@ body {
   border-right: none;
 }
 
+/* Out-of-balance banners (Trial Balance / Balance Sheet) */
+.rpt-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--amber-soft);
+  border: 1px solid color-mix(in srgb, var(--amber-ink) 35%, transparent);
+  border-left: 3.5px solid var(--amber);
+  border-radius: 11px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.rpt-banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rpt-banner-body strong {
+  color: var(--amber-ink);
+  font-size: 13.5px;
+  font-weight: 850;
+  letter-spacing: 0.1px;
+}
+
+.rpt-banner-body span {
+  color: var(--ink-2, var(--ink));
+  font-size: 12.8px;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Balance Sheet */
 .rpt-bs-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 18px;
+  /* Panels stretch to equal height (Balance / P&L sides share a baseline);
+     the pinned totals bar below absorbs the leftover space of a shorter side.
+     Table rows are safe: the table itself is content-sized (flex: 0 0 auto),
+     so stretching never inflates row heights. */
 }
 
 .rpt-bs-panel {
@@ -3160,7 +3211,8 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -3172,6 +3224,7 @@ body {
   padding: 14px 24px;
   background: linear-gradient(90deg, var(--primary-soft) 0%, transparent 100%);
   border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -3212,14 +3265,6 @@ body {
   background: color-mix(in srgb, var(--surface-2) 70%, transparent);
   font-weight: 800;
   border-top: 1px solid var(--border);
-}
-
-.rpt-bs-table tfoot .rpt-grand td {
-  background: var(--surface-2);
-  font-weight: 900;
-  font-size: 14px;
-  border-top: 2px solid var(--border-strong);
-  padding: 13px 24px;
 }
 
 .rpt-bs-table .rpt-empty {
@@ -3304,7 +3349,6 @@ body {
   }
 }
 
-
 /* Sticky report footers */
 .rpt-card {
   display: flex;
@@ -3329,8 +3373,7 @@ body {
 
 .rpt-table tfoot tr,
 .rpt-tshape tfoot tr,
-.rpt-cf-table tfoot tr,
-.rpt-bs-table tfoot tr {
+.rpt-cf-table tfoot tr {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -3342,7 +3385,10 @@ body {
 }
 
 .rpt-bs-panel table {
-  flex: 1 1 auto;
+  /* Natural height only: with flex: 1 1 auto the table grew to a definite
+     panel height and HTML row distribution inflated the sparse Liabilities
+     rows (the "rows are taller on the liability side" bug). */
+  flex: 0 0 auto;
 }
 
 .rpt-bs-panel thead,
@@ -3352,10 +3398,30 @@ body {
   z-index: 2;
 }
 
-.rpt-bs-panel tfoot tr {
+/* Pinned totals bar of a Balance-Sheet-style panel (used by both the Balance
+   Sheet and the two-panel P&L). Occupies the panel's bottom edge at natural
+   height — margin-top: auto absorbs whatever space the stretched panel has —
+   and stays visible while the table scrolls (sticky bottom). This is the same
+   "total fixed at the bottom" behaviour as the Trial Balance, achieved without
+   giving the table a definite height, which is what inflated row heights. */
+.rpt-bs-totals {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: auto;
+  background: var(--surface-2);
+  border-top: 2px solid var(--border-strong);
+  padding: 13px 26px;
+  font-weight: 900;
+  font-size: 14px;
   position: sticky;
   bottom: 0;
   z-index: 3;
+}
+
+.rpt-bs-totals .num {
+  font-variant-numeric: tabular-nums;
 }
 
 .rpt-wrap {

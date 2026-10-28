@@ -96,9 +96,10 @@ app.whenReady().then(async () => {
     const accounts = Store.db.accounts;
     const vouchers = Store.db.vouchers;
     const debitNormal = (a) => a.group === 'Assets' || a.group === 'Expenses';
-    const bal = (a, upto) => {
+    const bal = (a, upto, after) => {
       let d = 0, c = 0;
       for (const x of vouchers) {
+        if (after && x.date < after) continue;
         if (upto && x.date > upto) continue;
         if (x.dr === a.id) d += x.amount;
         if (x.cr === a.id) c += x.amount;
@@ -123,13 +124,22 @@ app.whenReady().then(async () => {
     };
 
     const out = { checks: [], period: { all: null }, errors: [] };
-    const collect = (label, got, want) => out.checks.push(chk(label, got, want));
+    const collect = (label, got, want, tol) => out.checks.push(chk(label, got, want, tol));
 
     // ---- Per-account balances, all-time (upto = none) ----
     for (const a of accounts) {
       const mine = bal(a, null);
       const theirs = Store.balanceOf(a.id);
       collect('balance.' + a.id, theirs, mine);
+    }
+
+    // ---- Opening-set imbalance: every voucher is self-balancing (dr == cr),
+    // so a trial-balance gap can only come from unbalanced openings. The app
+    // must reproduce that gap exactly, not pretend the book is balanced.
+    let openImb = 0;
+    for (const a of accounts) {
+      const op = Number(a.opening) || 0;
+      openImb += debitNormal(a) ? op : -op;
     }
 
     // ---- Trial balance (as-of end of period; here all-time) ----
@@ -141,16 +151,18 @@ app.whenReady().then(async () => {
       const isDebit = debitNormal(a) ? b >= 0 : b < 0;
       if (isDebit) dr += amt; else cr += amt;
     }
-    collect('trial.debit', dr, cr, 0.005);
+    collect('trial.fluxPreserved', dr - cr, openImb, 0.005);
     const trialSum = dr + cr;
 
-    // ---- P&L (all-time flows) ----
-    const f = flows(null, null);
+    // ---- P&L (all-time) — canonical contract: normal-balance sums over full
+    // account balances (opening-inclusive), identical to views.plFigures().
+    // The old flows-only model disagreed with the P&L the moment a real book
+    // kept brought-forward openings on Income/Expense accounts.
     let income = 0, expense = 0;
     for (const a of accounts) {
-      const g = f[a.id] || { dr: 0, cr: 0 };
-      if (a.group === 'Income') income += g.cr - g.dr;
-      if (a.group === 'Expenses') expense += g.dr - g.cr;
+      const b = bal(a, null);
+      if (a.group === 'Income') income += b;
+      else if (a.group === 'Expenses') expense += b;
     }
     const net = income - expense;
     collect('pl.income', income, income);
@@ -170,15 +182,29 @@ app.whenReady().then(async () => {
       if (a.group === 'Assets') assetsSum += b;
       if (a.group === 'Liabilities') liab += b;
     }
-    const capitalTotal = liab + net + plOpen;
-    collect('bs.balanced', Math.abs(assetsSum - capitalTotal), 0, 0.005);
+
+    // ---- Flow-based net (vouchers only): the CF's A+B+C building block and
+    // the harness's capital-form equivalent of the app's plFigures net. ----
+    const f = flows(null, null);
+    let fincome = 0, fexpense = 0;
+    for (const a of accounts) {
+      const g = f[a.id] || { dr: 0, cr: 0 };
+      if (a.group === 'Income') fincome += g.cr - g.dr;
+      if (a.group === 'Expenses') fexpense += g.dr - g.cr;
+    }
+    const fnet = fincome - fexpense;
+    const capitalTotal = liab + fnet + plOpen;
+    collect('bs.imbalanceVsOpenings', Math.abs(assetsSum - capitalTotal), Math.abs(openImb), 0.005);
 
     out.expected = { trialDr: +dr.toFixed(2), trialCr: +cr.toFixed(2), inc: +income.toFixed(2), exp: +expense.toFixed(2), net: +net.toFixed(2), assets: +assetsSum.toFixed(2), liab: +liab.toFixed(2), plOpen: +plOpen.toFixed(2), capital: +capitalTotal.toFixed(2), trialSum: +(dr + cr).toFixed(2) };
     out.accounts = accounts.length;
     out.vouchers = vouchers.length;
 
     // ---- Drive the UI and read rendered totals ----
-    const open = (name) => { state.report = name; state.period = null; renderReports(); };
+    // open() must NOT clobber state.period: the bounded-period section sets it
+    // first and expects period-filtered reads afterwards. Nulling it here made
+    // every post-period check silently compare all-time figures.
+    const open = (name) => { state.report = name; renderReports(); };
     const readData = (name) => {
       const el = document.querySelector('[data-total-' + name + ']');
       return el ? el.getAttribute('data-total-' + name) : null;
@@ -188,22 +214,64 @@ app.whenReady().then(async () => {
     const tdv = parseFloat(readData('dr')), tcv = parseFloat(readData('cr'));
     collect('ui.trial.dr', tdv, out.expected.trialDr);
     collect('ui.trial.cr', tcv, out.expected.trialCr);
-    out.ui = { trialDr: readData('dr'), trialCr: readData('cr') };
+    // The out-of-balance banner must lead the report and state exactly the
+    // opening-set gap (vouchers cannot produce a dr≠cr difference).
+    const readDiff = () => {
+      const el = document.querySelector('[data-total-diff]');
+      return el ? parseFloat(el.getAttribute('data-total-diff')) : null;
+    };
+    const trialDiff = readDiff();
+    collect('ui.trial.diff', trialDiff, openImb, 0.005);
+    out.ui = { trialDr: readData('dr'), trialCr: readData('cr'), trialDiff };
 
     open('pl');
     const inc = parseFloat(readData('income'));
     const exp = parseFloat(readData('expense'));
     const n = parseFloat(readData('net'));
-    collect('ui.pl.income', inc, out.expected.inc);
-    collect('ui.pl.expense', exp, out.expected.exp);
-    collect('ui.pl.net', n, Math.abs(out.expected.net));
+    // T-shaped P&L: both panel totals balance on the heavier side's grand
+    // total, and a net row (signed data-total-net) is required on the lighter
+    // side whenever the statement is not broken-even.
+    collect('ui.pl.net', n, out.expected.net, 0.005);
+    collect('ui.pl.balanced', inc - exp, 0, 0.01);
+    collect('ui.pl.grand', inc, Math.max(out.expected.inc, out.expected.exp));
+    collect('ui.pl.grandExp', exp, Math.max(out.expected.inc, out.expected.exp));
+    const netRowEl = document.querySelector('[data-total-net]');
+    collect(
+      'ui.pl.netRowRequired',
+      Math.abs(out.expected.net) < 0.005 ? (netRowEl ? 1 : 0) : netRowEl ? 0 : 1,
+      0
+    );
     out.ui.plNet = readData('net');
+
+    // PL = Balance-Sheet-style two-panel view: panel totals pinned to their
+    // panel bottoms, balancing at one grand total — no separate net cards.
+    const plBars = [...document.querySelectorAll('.rpt-bs-totals')];
+    const pinGap = (b) => {
+      const p = b.closest('.rpt-bs-panel');
+      if (!p) return 1;
+      return Math.abs(p.getBoundingClientRect().bottom - b.getBoundingClientRect().bottom) < 2 ? 0 : 1;
+    };
+    collect('ui.pl.panelBars', plBars.length, 2);
+    collect('ui.pl.pinned', plBars.map(pinGap).reduce((s, x) => s + x, 0), 0);
+    collect('ui.pl.netStripRemoved', document.querySelector('.rpt-pl-net') ? 1 : 0, 0);
 
     open('balance');
     const aTot = parseFloat(readData('assets'));
     const lTot = parseFloat(readData('liabilities'));
     collect('ui.bs.assets', aTot, out.expected.assets);
-    collect('ui.bs.liabilities', lTot, out.expected.capital);
+    // The equity panel now carries the explicit Profit & Loss A/c plus an
+    // Opening Difference (Suspense A/c) row, so its grand total must equal the
+    // asset side on EVERY book — including ones with unbalanced openings.
+    collect('ui.bs.liabilities', lTot, out.expected.assets);
+    // And its banner must proclaim the same opening gap at the very top.
+    const bsDiff = readDiff();
+    collect('ui.bs.diff', bsDiff, openImb, 0.005);
+    out.ui.bsDiff = bsDiff;
+
+    // Same pinned-totals contract for the Balance Sheet's own two panels.
+    const bsBars = [...document.querySelectorAll('.rpt-bs-totals')];
+    collect('ui.bs.totalsBars', bsBars.length, 2);
+    collect('ui.bs.pinned', bsBars.map(pinGap).reduce((s, x) => s + x, 0), 0);
 
     // ---- Cash flow (indirect, all-time): activities reconcile to cash change ----
     const catOf = (a) =>
@@ -220,7 +288,7 @@ app.whenReady().then(async () => {
             ? 'Revenue from Operations'
             : 'Other Expenses');
     const cashAcct = (a) => a.group === 'Assets' && (a.type === 'Cash' || a.type === 'Bank');
-    let cfo = net;
+    let cfo = fnet;
     let cfi = 0;
     let cff = 0;
     for (const a of accounts) {
@@ -250,6 +318,16 @@ app.whenReady().then(async () => {
     collect('cf.net', parseFloat(readData('netcash')), netCash, 0.005);
     collect('cf.reconcile', Math.abs(parseFloat(readData('netcash')) - cashChange), 0, 0.005);
     collect('cf.close', parseFloat(readData('cash-close')), cashClose, 0.005);
+    // Two-panel format: the printed identity (Net change + Opening = Close)
+    // must hold on the printed bars/rows themselves.
+    collect(
+      'cf.uiReconcile',
+      parseFloat(readData('netcash')) + (parseFloat(readData('cash-open')) || 0),
+      parseFloat(readData('cash-close')),
+      0.005
+    );
+    const cfBars = [...document.querySelectorAll('.rpt-bs-totals')];
+    collect('cf.panelBars', cfBars.length, 2);
     out.expected.cfo = +cfo.toFixed(2);
     out.expected.cfi = +cfi.toFixed(2);
     out.expected.cff = +cff.toFixed(2);
@@ -263,18 +341,22 @@ app.whenReady().then(async () => {
     state.period = { from, to };
 
     open('pl');
-    const pf = flows(from, to);
+    // Canonical period contract (same arithmetic as the app's plFigures for
+    // the window): normal-balance balances incl. openings, filtered to range.
     let pinc = 0, pexp = 0;
     for (const a of accounts) {
-      const g = pf[a.id] || { dr: 0, cr: 0 };
-      if (a.group === 'Income') pinc += g.cr - g.dr;
-      if (a.group === 'Expenses') pexp += g.dr - g.cr;
+      const b = bal(a, to, from);
+      if (a.group === 'Income') pinc += b;
+      else if (a.group === 'Expenses') pexp += b;
     }
-    const pnet = pinc - pexp;
-    const pincUi = parseFloat(readData('income'));
-    const pexpUi = parseFloat(readData('expense'));
-    collect('period.pl.income', pincUi, pinc);
-    collect('period.pl.expense', pexpUi, pexp);
+    const pnet = +(pinc - pexp).toFixed(2);
+    // T-shaped contract: both panel bars balance on the heavier side's grand
+    // total (the window here is a loss — income side carries the Net Loss row).
+    const pgincUi = parseFloat(readData('income'));
+    const pgexpUi = parseFloat(readData('expense'));
+    collect('period.pl.grandIncome', pgincUi, +Math.max(pinc, pexp).toFixed(2));
+    collect('period.pl.grandExpenses', pgexpUi, +Math.max(pinc, pexp).toFixed(2));
+    collect('period.pl.balanced', pgincUi - pgexpUi, 0, 0.01);
 
     open('trial');
     let pdr = 0, pcr = 0;
@@ -291,26 +373,33 @@ app.whenReady().then(async () => {
     const readCard = (k) =>
       parseFloat(document.querySelector('[data-card-' + k + ']').getAttribute('data-card-' + k));
 
+    // Cash & Bank of ASSET accounts only — matching the app's card exactly. A
+    // "Credit Card" of type Bank under Liabilities is not cash (this book has
+    // one), and including it broke the check by its balance. In period mode
+    // the cash cards are a POSITION as of the period END date (the same as-of
+    // rule the Balance Sheet follows — app was updated away from always-current).
     let liquid = 0;
-    for (const a of accounts) if (a.type === 'Cash' || a.type === 'Bank') liquid += bal(a, null);
+    for (const a of accounts)
+      if (a.group === 'Assets' && (a.type === 'Cash' || a.type === 'Bank'))
+        liquid += bal(a, to);
 
     let liquidity = 0;
     const isLiq = (a) => (typeof a.liquid === 'boolean' ? a.liquid : a.type === 'Cash' || a.type === 'Bank');
     for (const a of accounts) {
       const c = catOf(a);
       if (c === 'Current Assets') {
-        if (isLiq(a)) liquidity += bal(a, null);
+        if (isLiq(a)) liquidity += bal(a, to);
       } else if (c === 'Current Liabilities') {
-        liquidity -= bal(a, null);
+        liquidity -= bal(a, to);
       }
     }
 
     showView('dashboard', { record: false });
-    collect('dash.period.income', readCard('income'), pinc);
-    collect('dash.period.expense', readCard('expense'), pexp);
+    collect('dash.period.income', readCard('income'), +pinc.toFixed(2));
+    collect('dash.period.expense', readCard('expense'), +pexp.toFixed(2));
     collect('dash.period.net', readCard('net'), pnet);
-    collect('dash.liquid', readCard('liquid'), liquid);
-    collect('dash.liquidity', readCard('liquidity'), liquidity);
+    collect('dash.liquid', readCard('liquid'), +liquid.toFixed(2));
+    collect('dash.liquidity', readCard('liquidity'), +liquidity.toFixed(2));
     out.ui.dashPeriod = {
       income: readCard('income'),
       expense: readCard('expense'),
@@ -334,9 +423,9 @@ app.whenReady().then(async () => {
       if (a.group === 'Income') mi += acr - adr;
       else if (a.group === 'Expenses') me += adr - acr;
     }
-    collect('dash.month.income', readCard('income'), mi);
-    collect('dash.month.expense', readCard('expense'), me);
-    collect('dash.month.net', readCard('net'), mi - me);
+    collect('dash.month.income', readCard('income'), +mi.toFixed(2));
+    collect('dash.month.expense', readCard('expense'), +me.toFixed(2));
+    collect('dash.month.net', readCard('net'), +(mi - me).toFixed(2));
     out.ui.dashMonth = { income: readCard('income'), expense: readCard('expense'), net: readCard('net') };
     out.dashMonth = { income: mi, expense: me };
 

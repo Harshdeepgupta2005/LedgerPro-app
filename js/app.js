@@ -79,7 +79,6 @@ function showView(name) {
   hideGlobalResults();
 
   renderCurrent();
-  renderGlobalResults();
 }
 
 function entryChain() {
@@ -503,6 +502,15 @@ function wireEvents() {
         clearRowNav();
         return;
       }
+      if (typing) {
+        // An input has (auto)focus — drop it first so the sidebar letter
+        // shortcuts work again; don't navigate on this press. This runs before
+        // the edit-cancel branch so Escape inside a field never wipes unsaved
+        // form work in one stroke; blur first, cancel on the second press.
+        e.preventDefault();
+        document.activeElement.blur();
+        return;
+      }
       if (state.editingId) {
         const ret = state.editReturnTo;
         resetEntryForm();
@@ -511,13 +519,6 @@ function wireEvents() {
           return;
         }
         // If we came from the vouchers view (or don't know), just clear the form.
-        return;
-      }
-      if (typing) {
-        // An input has (auto)focus — drop it first so the sidebar letter
-        // shortcuts work again; don't navigate on this press.
-        e.preventDefault();
-        document.activeElement.blur();
         return;
       }
       e.preventDefault();
@@ -598,7 +599,18 @@ function wireEvents() {
       }
     }
 
-    if (e.altKey && !e.metaKey && !e.ctrlKey && state.view === 'vouchers' && !state.editingId) {
+    // Alt+digit switches voucher type — but never while the user is mid-typing
+    // in a field (the combo would eat the keystroke and silently switch type,
+    // possibly dropping committed sides) or while a suggestion list is open.
+    if (
+      e.altKey &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      state.view === 'vouchers' &&
+      !state.editingId &&
+      !typing &&
+      !state.suggest.side
+    ) {
       let idx = -1;
       if (e.code && /^Digit[1-4]$/.test(e.code)) idx = Number(e.code.slice(5)) - 1;
       else if (['1', '2', '3', '4'].includes(e.key)) idx = Number(e.key) - 1;
@@ -651,6 +663,10 @@ function wireEvents() {
     }
     state.period = { from, to };
     Prefs.setPeriod(state.period);
+    // Clear any validation error a failed attempt left visible — a successful
+    // submit must not keep the stale "out of range" message in the modal for
+    // the next time it opens.
+    $('#periodModalError').hidden = true;
     closeModal($('#periodModal'));
     renderTopbarCal();
     renderCurrent();
@@ -664,6 +680,41 @@ function wireEvents() {
     renderTopbarCal();
     renderCurrent();
     toast('Reporting period cleared — All time');
+  });
+
+  $('#periodThisMonthBtn').addEventListener('click', () => {
+    const now = new Date();
+    const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const lastOfMonth = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${lastDay.getDate()}`;
+    $('#periodFromInput').value = firstOfMonth;
+    $('#periodToInput').value = lastOfMonth;
+    state.period = { from: firstOfMonth, to: lastOfMonth };
+    Prefs.setPeriod(state.period);
+    closeModal($('#periodModal'));
+    renderTopbarCal();
+    renderCurrent();
+    toast(`Reporting period ${fmtDate(firstOfMonth)} – ${fmtDate(lastOfMonth)}`);
+  });
+
+  $('#periodLastMonthBtn').addEventListener('click', () => {
+    const now = new Date();
+    // Previous month, not the current one: (month - 1) — JS normalises month
+    // -1 to December of the previous year. (This previously produced
+    // {from: 1st of current month, to: last of previous month} — a reversed,
+    // invalid range — whenever the window ran, mid-month.)
+    const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+    const firstLastMonth = `${firstOfLastMonth.getFullYear()}-${String(firstOfLastMonth.getMonth() + 1).padStart(2, '0')}-01`;
+    const lastLastMonth = `${lastDayOfLastMonth.getFullYear()}-${String(lastDayOfLastMonth.getMonth() + 1).padStart(2, '0')}-${lastDayOfLastMonth.getDate()}`;
+    $('#periodFromInput').value = firstLastMonth;
+    $('#periodToInput').value = lastLastMonth;
+    state.period = { from: firstLastMonth, to: lastLastMonth };
+    Prefs.setPeriod(state.period);
+    closeModal($('#periodModal'));
+    renderTopbarCal();
+    renderCurrent();
+    toast(`Reporting period ${fmtDate(firstLastMonth)} – ${fmtDate(lastLastMonth)}`);
   });
 
   $('#voucherTabs').addEventListener('click', (e) => {
@@ -915,6 +966,23 @@ function wireEvents() {
       hideGlobalResults();
       startEditVoucher(vch.dataset.resultVoucher);
     }
+  });
+
+  // The results panel is a body-level fixed element, so it also needs an
+  // explicit "click outside closes it" rule — clicking a dashboard card or any
+  // other control must not leave a results panel floating over the app.
+  document.addEventListener('mousedown', (e) => {
+    const box = $('#globalResults');
+    if (!box || box.hidden) return;
+    if (box.contains(e.target) || $('#searchBox').contains(e.target)) return;
+    hideGlobalResults();
+  });
+
+  // The panel is anchored to the search box rect; re-anchor when the window
+  // is resized while results are showing.
+  window.addEventListener('resize', () => {
+    const box = $('#globalResults');
+    if (box && !box.hidden) anchorGlobalResults();
   });
 
   $('#numberingSegment').addEventListener('click', (e) => {

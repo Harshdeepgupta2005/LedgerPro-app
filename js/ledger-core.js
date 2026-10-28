@@ -110,6 +110,15 @@ function accountBalance(vouchers, account, opts = {}) {
   return opening + (debitNormal ? dr - cr : cr - dr);
 }
 
+// Two-decimal, sign-aware half-away-from-zero rounding (i.e. Intl 's
+// halfExpand): the single rounding rule for every report total so displayed
+// figures, emitted data-total-* hooks and the smoke harness's own round2()
+// arithmetic never drift apart (float-sum dust → 0). A value shown as
+// "-₹0.01" is therefore never emitted as -0.00 by tie-breaking differences.
+function round2(n) {
+  return n < 0 ? -Math.round(-n * 100) / 100 : Math.round(n * 100) / 100;
+}
+
 // Indirect-method cash flow statement (AS 3 / Ind AS 7). Cash and cash
 // equivalents are Assets typed Cash/Bank. Every other account's period movement
 // is mapped to operating, investing or financing from its category, so the
@@ -123,7 +132,7 @@ function cashFlowStatement(accounts, vouchers, range) {
   const beginning = (a) => (before ? accountBalance(vouchers, a, { to: before }) : Number(a.opening) || 0);
   const ending = (a) => accountBalance(vouchers, a, to ? { to } : {});
   const change = (a) => ending(a) - beginning(a);
-  const isCash = (a) => a.group === 'Assets' && isLiquidAccount(a);
+  const isCash = (a) => a.group === 'Assets' && isLiquidType(a.type);
   const catOf = (a) => a.category || defaultCategory(a.group, a.type);
 
   let income = 0;
@@ -262,6 +271,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     leadingNumber,
     isDebitNormal,
+    round2,
     voucherNumberPrefix,
     nextVoucherNo,
     accountBalance,

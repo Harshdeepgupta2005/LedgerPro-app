@@ -313,6 +313,24 @@ function isoDate(monthsBack, day) {
 }
 
 function seedSampleData() {
+  // Dev mode only (LEDGERPRO_DEV=1, gated through main → preload as
+  // window.ledger.devSeed; packaged builds can never set it): demo the real
+  // ledger snapshot exported by scripts/export-real-seed.js into js/real-seed.js
+  // instead of the synthetic sample books. Every seeding path — fresh load,
+  // localStorage restore and Store.reset() — flows through this function, and
+  // each caller runs rebuildSeqs() afterwards, so ids/numbering stay canonical.
+  if (typeof window !== 'undefined' && window.ledger && window.ledger.devSeed) {
+    const src = globalThis.LEDGERPRO_REAL_SEED;
+    if (src && Array.isArray(src.accounts) && Array.isArray(src.vouchers)) {
+      return {
+        accounts: src.accounts.map((a) => ({ ...a })),
+        vouchers: src.vouchers.map((v) => ({ ...v })),
+      };
+    }
+    console.error(
+      'Dev seed requested (LEDGERPRO_DEV=1) but no real-seed.js snapshot was found — falling back to sample data.'
+    );
+  }
   const accounts = [
     {
       id: 'acc1',
@@ -444,9 +462,7 @@ function seedSampleData() {
     return {
       id: 'v' + (i + 1),
       no: `${prefix}-${String(counters[v.type]).padStart(4, '0')}`,
-      createdAt: new Date(
-        new Date(`${v.date}T09:00:00`).getTime() + i * 60000
-      ).toISOString(),
+      createdAt: new Date(new Date(`${v.date}T09:00:00`).getTime() + i * 60000).toISOString(),
       ...v,
     };
   });

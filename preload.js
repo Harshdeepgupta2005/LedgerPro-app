@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('ledger', {
   platform: process.platform || '',
   hasSqlite: Boolean(ipcRenderer.sendSync('db:mode')),
   appVersion: ipcRenderer.sendSync('app:version'),
+  devSeed: Boolean(ipcRenderer.sendSync('app:flags').devSeed),
   versions: {
     app: process.versions.electron,
     chrome: process.versions.chrome,

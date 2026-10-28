@@ -93,8 +93,16 @@ const MIGRATIONS = {
 };
 
 function migrate() {
-  let current = Number(metaGet('schemaVersion')) || 1;
   const target = Number(SCHEMA_VERSION);
+  let current = Number(metaGet('schemaVersion')) || 1;
+  // A database written by a NEWER build must never be silently downgraded:
+  // rewriting the marker below would make this build run old-schema writes
+  // against unknown columns (silent data risk). Surface it as an open failure
+  // instead — main.js degrades to read-only localStorage mode and nothing ever
+  // touches the on-disk books.
+  if (current > target) {
+    throw new Error(`Database schema v${current} is newer than this app supports (v${target})`);
+  }
   while (current < target) {
     const next = String(current + 1);
     const step = MIGRATIONS[next];
@@ -326,8 +334,12 @@ function exportBackup(target) {
 }
 
 function validateDbFile(file) {
-  const d = new Database(String(file), { readonly: true });
+  let d = null;
   try {
+    // The constructor itself throws for missing/corrupt files (SQLITE_NOTADB),
+    // so it must sit inside the try — a throw here must return {ok:false} and
+    // become the friendly toast, never an unhandled IPC rejection.
+    d = new Database(String(file), { readonly: true });
     const tables = d
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
       .all()
@@ -352,7 +364,7 @@ function validateDbFile(file) {
   } catch (e) {
     return { ok: false, error: 'Not a readable SQLite database' };
   } finally {
-    d.close();
+    if (d) d.close();
   }
 }
 

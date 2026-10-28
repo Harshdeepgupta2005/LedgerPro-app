@@ -392,10 +392,13 @@ out.ui.rowsNav = { rowCount, hl, any: hl === 1 && rowCount >= 2 };
   if (!u.pl) failures.push('profit & loss report missing');
   else {
     if (u.pl.title !== 'Profit & Loss Statement') failures.push(`P&L title '${u.pl.title}'`);
-    if (Math.abs(u.pl.income - u.expected.income) > eps)
-      failures.push(`P&L income ${u.pl.income} != ${u.expected.income}`);
-    if (Math.abs(u.pl.expense - u.expected.expense) > eps)
-      failures.push(`P&L expense ${u.pl.expense} != ${u.expected.expense}`);
+    // T-shaped P&L: both panel bars balance on the heavier side's grand total
+    // (loss → the Net row lives in the Income panel; profit → Expenses).
+    const plGrand = Math.max(u.expected.income, u.expected.expense);
+    if (Math.abs(u.pl.income - plGrand) > eps)
+      failures.push(`P&L income-side total ${u.pl.income} != ${plGrand}`);
+    if (Math.abs(u.pl.expense - plGrand) > eps)
+      failures.push(`P&L expense-side total ${u.pl.expense} != ${plGrand}`);
     if (Math.abs(u.pl.net - u.expected.net) > eps) failures.push(`P&L net ${u.pl.net} != ${u.expected.net}`);
   }
   if (!u.balance) failures.push('balance sheet report missing');
@@ -446,10 +449,12 @@ out.ui.rowsNav = { rowCount, hl, any: hl === 1 && rowCount >= 2 };
     }
     if (!u.periodPL) failures.push('period-filtered P&L missing');
     else {
-      if (Math.abs(u.periodPL.income - u.periodExpected.income) > eps)
-        failures.push(`period P&L income ${u.periodPL.income} != ${u.periodExpected.income}`);
-      if (Math.abs(u.periodPL.expense - u.periodExpected.expense) > eps)
-        failures.push(`period P&L expense ${u.periodPL.expense} != ${u.periodExpected.expense}`);
+      // Same T-shaped contract as above, for the period-bounded window.
+      const pGrand = Math.max(u.periodExpected.income, u.periodExpected.expense);
+      if (Math.abs(u.periodPL.income - pGrand) > eps)
+        failures.push(`period P&L income-side total ${u.periodPL.income} != ${pGrand}`);
+      if (Math.abs(u.periodPL.expense - pGrand) > eps)
+        failures.push(`period P&L expense-side total ${u.periodPL.expense} != ${pGrand}`);
       if (Math.abs(u.periodPL.net - u.periodExpected.plNet) > eps)
         failures.push(`period P&L net ${u.periodPL.net} != ${u.periodExpected.plNet}`);
     }

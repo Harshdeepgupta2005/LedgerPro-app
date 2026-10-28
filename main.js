@@ -101,6 +101,16 @@ ipcMain.on('app:version', (event) => {
   event.returnValue = app.getVersion();
 });
 
+// Feature flags for the renderer, resolved in the main process so sandboxed
+// preloads never touch process.env directly. devSeed swaps the synthetic demo
+// books for the real-ledger snapshot — an explicit dev opt-in (LEDGERPRO_DEV=1)
+// that can never activate in packaged builds.
+ipcMain.on('app:flags', (event) => {
+  event.returnValue = {
+    devSeed: !app.isPackaged && process.env.LEDGERPRO_DEV === '1',
+  };
+});
+
 ipcMain.on('app:quit', () => {
   app.quit();
 });

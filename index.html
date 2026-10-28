@@ -115,7 +115,6 @@
             <button type="button" class="search-clear" id="searchClear" aria-label="Clear search" hidden>
               <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </button>
-            <div class="global-results" id="globalResults" hidden></div>
           </div>
           <div class="topbar-spacer">
             <div class="topbar-cal" id="topbarCal">
@@ -687,8 +686,10 @@
           </div>
           <p class="form-error" id="periodModalError" role="alert" hidden></p>
           <div class="modal-actions">
-            <button type="button" class="btn btn-outline" data-close>Cancel</button>
-            <button type="button" class="btn btn-outline" id="periodClearBtn">All time</button>
+            <button type="button" class="btn btn-outline btn-sm" data-close>Cancel</button>
+            <button type="button" class="btn btn-outline btn-sm" id="periodThisMonthBtn">This Month</button>
+            <button type="button" class="btn btn-outline btn-sm" id="periodLastMonthBtn">Last Month</button>
+            <button type="button" class="btn btn-outline btn-sm" id="periodClearBtn">All time</button>
             <button type="submit" class="btn btn-primary" id="periodSaveBtn">Apply Period</button>
           </div>
         </form>
@@ -712,11 +713,17 @@
       </div>
     </div>
 
+    <!-- Global search results live at <body> level (position: fixed, JS-anchored to
+         the search box) so they paint above the frosted-glass topbar's stacking
+         context — dashboard cards, drawers, modals and toasts. -->
+    <div class="global-results" id="globalResults" hidden></div>
+
     <div class="toast-stack" id="toastStack" role="status" aria-live="polite"></div>
 
     <div id="printLedger"></div>
 
     <script src="js/ledger-core.js"></script>
+    <script src="js/real-seed.js"></script>
     <script src="js/data.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/views.js"></script>

@@ -130,16 +130,27 @@ function monthlyFigures() {
 /* ---------- Dashboard ---------- */
 
 function renderDashboard() {
-  const { income, expense } = monthlyFigures();
+  // Period mode must agree with the P&L printed for the same window — same
+  // normal-balance (opening-inclusive) contract via plFigures. With no period
+  // selected, cards keep their month-flows semantics ("This month").
+  const { income, expense } = state.period ? plFigures(state.period) : monthlyFigures();
   const statsSub = state.period ? 'In selected period' : 'This month';
+  // The cash cards are POSITION statements, not flows: with a reporting period
+  // active they must show the position as of the period's END date (the same
+  // as-of rule the Balance Sheet uses), never today's balance smuggled into a
+  // past period. Without a period they stay the current position.
+  const cashAsOf = state.period ? { to: state.period.to } : null;
+  const asOfSub = state.period ? `As on ${fmtDate(state.period.to)}` : '';
   const liquid = Store.db.accounts
     .filter((a) => a.group === 'Assets' && (a.type === 'Cash' || a.type === 'Bank'))
-    .reduce((sum, a) => sum + Store.balanceOf(a.id), 0);
+    .reduce((sum, a) => sum + Store.balanceOf(a.id, cashAsOf), 0);
 
   const currentLiquid = Store.db.accounts.reduce((sum, a) => {
     const c = a.category || defaultCategory(a.group, a.type);
-    if (a.group === 'Assets' && c === 'Current Assets' && isLiquid(a)) return sum + Store.balanceOf(a.id);
-    if (a.group === 'Liabilities' && c === 'Current Liabilities') return sum - Store.balanceOf(a.id);
+    if (a.group === 'Assets' && c === 'Current Assets' && isLiquid(a))
+      return sum + Store.balanceOf(a.id, cashAsOf);
+    if (a.group === 'Liabilities' && c === 'Current Liabilities')
+      return sum - Store.balanceOf(a.id, cashAsOf);
     return sum;
   }, 0);
 
@@ -149,15 +160,15 @@ function renderDashboard() {
         <span class="stat-label">Cash &amp; Bank</span>
         <span class="stat-icon tint-blue">${ICONS.wallet}</span>
       </div>
-      <div class="stat-value" data-card-liquid="${liquid}">${fmtCompact(liquid)}</div>
-      <div class="stat-sub">Across all cash &amp; bank accounts</div>
+      <div class="stat-value" data-card-liquid="${num2(liquid)}">${fmtCompact(liquid)}</div>
+      <div class="stat-sub">${asOfSub || 'Across all cash &amp; bank accounts'}</div>
     </div>
     <div class="stat">
       <div class="stat-top">
         <span class="stat-label">Income</span>
         <span class="stat-icon tint-green">${ICONS.arrowDown}</span>
       </div>
-      <div class="stat-value text-green" data-card-income="${income}">${fmtCompact(income)}</div>
+      <div class="stat-value text-green" data-card-income="${num2(income)}">${fmtCompact(income)}</div>
       <div class="stat-sub">${statsSub}</div>
     </div>
     <div class="stat">
@@ -165,7 +176,7 @@ function renderDashboard() {
         <span class="stat-label">Expenses</span>
         <span class="stat-icon tint-red">${ICONS.arrowUp}</span>
       </div>
-      <div class="stat-value text-red" data-card-expense="${expense}">${fmtCompact(Math.abs(expense))}</div>
+      <div class="stat-value text-red" data-card-expense="${num2(expense)}">${fmtCompact(Math.abs(expense))}</div>
       <div class="stat-sub">${statsSub}</div>
     </div>
     <div class="stat">
@@ -173,7 +184,7 @@ function renderDashboard() {
         <span class="stat-label">Net Profit</span>
         <span class="stat-icon tint-indigo">${ICONS.chart}</span>
       </div>
-      <div class="stat-value ${income - expense >= 0 ? 'text-green' : 'text-red'}" data-card-net="${income - expense}">${fmtCompact(income - expense)}</div>
+      <div class="stat-value ${income - expense >= 0 ? 'text-green' : 'text-red'}" data-card-net="${num2(income - expense)}">${fmtCompact(income - expense)}</div>
       <div class="stat-sub">${statsSub}</div>
     </div>
     <div class="stat">
@@ -181,8 +192,8 @@ function renderDashboard() {
         <span class="stat-label">Current Liquidity</span>
         <span class="stat-icon tint-cyan">${ICONS.droplet}</span>
       </div>
-      <div class="stat-value ${currentLiquid < 0 ? 'text-red' : 'text-green'}" data-card-liquidity="${currentLiquid}">${fmtCompact(currentLiquid)}</div>
-      <div class="stat-sub">Liquid current assets minus current liabilities</div>
+      <div class="stat-value ${currentLiquid < 0 ? 'text-red' : 'text-green'}" data-card-liquidity="${num2(currentLiquid)}">${fmtCompact(currentLiquid)}</div>
+      <div class="stat-sub">${asOfSub || 'Liquid current assets minus current liabilities'}</div>
     </div>`;
 
   renderChart();
@@ -409,12 +420,23 @@ function suggestEl(side) {
 function renderSideSuggestions(side) {
   const el = suggestEl(side);
   const matches = ledgerSuggestions(side);
-  if (!matches.length) {
-    if (state.suggest.side === side) {
-      state.suggest.side = null;
-      state.suggest.list = [];
-      state.suggest.index = 0;
+  // Focusing the other side must retire this side's open panel — the 130ms
+  // blur timer only cleans up when its own side is still active, so without
+  // this a stale list stays visible and clickable next to the live one.
+  if (state.suggest.side && state.suggest.side !== side) {
+    const staleEl = suggestEl(state.suggest.side);
+    if (staleEl) {
+      staleEl.hidden = true;
+      staleEl.innerHTML = '';
     }
+    state.suggest.side = null;
+    state.suggest.list = [];
+    state.suggest.index = 0;
+  }
+  if (!matches.length) {
+    state.suggest.side = null;
+    state.suggest.list = [];
+    state.suggest.index = 0;
     el.hidden = true;
     el.innerHTML = '';
     return;
@@ -471,6 +493,23 @@ function selectSideSuggestion() {
 
 /* ---------- Global search ---------- */
 
+// The results panel is a <body>-level element with position: fixed so it can
+// paint above the frosted-glass topbar (whose backdrop-filter creates a
+// stacking context that would bury any dropdown left inside the topbar).
+// Because the search box sits in the topbar's middle grid column, we anchor
+// the panel to the live box rect — same geometry the old in-flow dropdown had
+// (left/right 0 of the search box, 8px below it), but immune to stacking and
+// clipping from any ancestor.
+function anchorGlobalResults() {
+  const box = $('#globalResults');
+  const anchor = $('#searchBox');
+  if (!box || !anchor) return;
+  const r = anchor.getBoundingClientRect();
+  box.style.left = `${Math.round(r.left)}px`;
+  box.style.width = `${Math.round(r.width)}px`;
+  box.style.top = `${Math.round(r.bottom + 8)}px`;
+}
+
 function globalSearchMatches() {
   const q = (state.search || '').trim().toLowerCase();
   if (!q) return { accounts: [], vouchers: [] };
@@ -494,8 +533,11 @@ function renderGlobalResults() {
   clear.hidden = !state.search;
   const q = (state.search || '').trim();
   const isFilterView = state.view === 'accounts' || state.view === 'register';
-  const focused = document.activeElement === $('#searchInput');
-  if (!q || isFilterView || !focused) {
+  // No focus gate: the panel tracks the search text, not the keyboard. It is
+  // dismissed by Escape, the clear button, the outside-click closer, opening a
+  // modal or the ledger, and showView — so deciding purely on state here is
+  // safe (and lets programmatic/AT-driven inputs show results too).
+  if (!q || isFilterView) {
     box.hidden = true;
     box.innerHTML = '';
     state.resultIndex = 0;
@@ -532,6 +574,7 @@ function renderGlobalResults() {
       : `<div class="result-empty">No matches for “${esc(state.search.trim())}”.</div>`;
   state.resultIndex = 0;
   highlightGlobalResults();
+  anchorGlobalResults();
   box.hidden = false;
 }
 
@@ -851,6 +894,7 @@ function renderLedger() {
 
 function openLedger(id) {
   if (!Store.account(id)) return;
+  hideGlobalResults();
   state.ledgerId = id;
   $('#ledgerOverlay').hidden = false;
   renderLedger();
@@ -879,7 +923,10 @@ function ledgerCSV(a) {
     if (!isNumeric && /^[=+\-@]/.test(str.trim())) str = "'" + str;
     return `"${str.replace(/"/g, '""')}"`;
   };
-  const round = (n) => Math.round(n * 100) / 100;
+  // Same rounding contract as the on-screen ledger column (round2 in
+  // ledger-core: half away from zero) — an x.xx5 half on a negative balance
+  // must not export one paisa off from what the report shows.
+  const round = (n) => round2(n);
   const data = ledgerRowsData(a);
   const opening = ledgerStartBalance(a);
   const closing = data.length ? data[data.length - 1].bal : opening;
@@ -1082,11 +1129,22 @@ function closeReport() {
   renderCurrent();
 }
 
+// `round2` — the two-decimal, sign-aware, half-away-from-zero rounding rule —
+// lives in ledger-core.js (exported there) so the unit-test suite and every
+// report renderer share one definition: displayed figures, emitted
+// data-total-* hooks and the smoke harness's own round2() arithmetic never
+// drift apart, and "-₹0.01" is never emitted as -0.00.
+
+// Raw two-decimal money value used only for the data-total-* attributes in the
+// report footers — instrumentation the smoke harness reads via dataset
+// (parseFloat against its own round2() figures, ±0.01 tolerance); never shown.
+function num2(n) {
+  return round2(n);
+}
+
 function renderTrialBalance() {
   const range = asOfRange();
-  const accounts = Store.db.accounts
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const accounts = Store.db.accounts.slice().sort((a, b) => a.name.localeCompare(b.name));
 
   let debitTotal = 0;
   let creditTotal = 0;
@@ -1094,10 +1152,12 @@ function renderTrialBalance() {
   const rows = accounts
     .map((a) => {
       const bal = Store.balanceOf(a.id, range);
-      if (Math.abs(bal) < 0.005) return '';
+      // Same displayed-zero rule as the P&L and Balance Sheet lists: hide any
+      // row that prints as ₹0.00 so totals consist solely of listed rows.
+      if (round2(bal) === 0) return '';
       const debitNormal = isDebitNormal(a);
       const isDr = debitNormal ? bal >= 0 : bal < 0;
-      const amount = Math.abs(bal);
+      const amount = Math.abs(round2(bal));
       if (isDr) debitTotal += amount;
       else creditTotal += amount;
       return `
@@ -1109,8 +1169,28 @@ function renderTrialBalance() {
     })
     .join('');
 
+  const drTotal = round2(debitTotal);
+  const crTotal = round2(creditTotal);
+
+  // Out-of-balance surface, top of the report (task: "difference must display
+  // at the top"). Vouchers can never create a dr≠cr gap — each posts equal
+  // debits and credits — so a difference can only come from unbalanced opening
+  // balances. Surfaced here and in the Balance Sheet so it is impossible to
+  // miss, and measured by the data-total-diff hook for the report harness.
+  const tbDiff = round2(drTotal - crTotal);
+  const tbBanner =
+    Math.abs(tbDiff) >= 0.005
+      ? `<div class="rpt-banner" role="alert" data-total-diff="${num2(tbDiff)}">
+          <div class="rpt-banner-body">
+            <strong>Out of balance by ${fmt(Math.abs(tbDiff))}</strong>
+            <span>Debit ${fmt(drTotal)} · Credit ${fmt(crTotal)} — the ${tbDiff < 0 ? 'credit' : 'debit'} side is heavier by ${fmt(Math.abs(tbDiff))}. Vouchers always keep both sides equal, so this gap can only come from unbalanced opening balances. Post one corrective opening entry to clear it.</span>
+          </div>
+        </div>`
+      : '';
+
   $('#reportBody').innerHTML = `
     <div class="rpt-wrap">
+      ${tbBanner}
       <div class="rpt-header">
         <div class="rpt-title">Trial Balance</div>
         <div class="rpt-sub">As on ${esc(range ? fmtDate(range.to) : fmtDate(todayISO()))}${state.period ? ` · ${esc(periodLabel())}` : ''}</div>
@@ -1128,10 +1208,10 @@ function renderTrialBalance() {
             ${rows || '<tr><td colspan="3" class="rpt-empty">No accounts with balance</td></tr>'}
           </tbody>
           <tfoot>
-            <tr class="rpt-grand">
+            <tr class="rpt-grand" data-total-dr="${num2(drTotal)}" data-total-cr="${num2(crTotal)}">
               <td>Total</td>
-              <td class="num">${fmt(debitTotal)}</td>
-              <td class="num">${fmt(creditTotal)}</td>
+              <td class="num">${fmt(drTotal)}</td>
+              <td class="num">${fmt(crTotal)}</td>
             </tr>
           </tfoot>
         </table>
@@ -1139,56 +1219,44 @@ function renderTrialBalance() {
     </div>`;
 }
 
-function periodFlows(range) {
-  const flows = {};
-  const entry = (id) => flows[id] || (flows[id] = { dr: 0, cr: 0 });
-  for (const v of Store.db.vouchers) {
-    if (range && range.from && v.date < range.from) continue;
-    if (range && range.to && v.date > range.to) continue;
-    entry(v.dr).dr += v.amount;
-    entry(v.cr).cr += v.amount;
-  }
-  return flows;
-}
-
+// Single source of truth for P&L figures (shared with the balance sheet's
+// capital section): normal-balance sums per group via Store.balanceOf — the
+// SAME arithmetic the trial balance, ledger and dashboard use, including each
+// account's opening. Summing flows alone would ignore openings, so P&L net
+// could drift away from the balance sheet's capital line. Totals are rounded
+// once at the boundary (round2) so no float dust survives into the reports.
 function plFigures(range) {
-  const flows = periodFlows(range);
   let income = 0;
   let expense = 0;
   for (const a of Store.db.accounts) {
-    const f = flows[a.id] || { dr: 0, cr: 0 };
-    if (a.group === 'Income') income += f.cr - f.dr;
-    if (a.group === 'Expenses') expense += f.dr - f.cr;
+    const bal = Store.balanceOf(a.id, range);
+    if (a.group === 'Income') income += bal;
+    else if (a.group === 'Expenses') expense += bal;
   }
-  return { income, expense, net: income - expense, flows };
+  return { income: round2(income), expense: round2(expense), net: round2(income - expense) };
 }
 
 function renderPLStatement() {
   const range = reportRange();
-  const flows = periodFlows(range);
+  const figs = plFigures(range);
+  const expTotal = figs.expense;
+  const incTotal = figs.income;
+  const profit = figs.net;
 
-  const lineBalance = (a) => {
-    const f = flows[a.id] || { dr: 0, cr: 0 };
-    return a.group === 'Income' ? f.cr - f.dr : f.dr - f.cr;
-  };
-
-  let expTotal = 0;
-  let incTotal = 0;
+  // Per-line figures use the identical balanceOf arithmetic (normal balance
+  // incl. opening), so listed rows and the printed totals can never disagree.
+  const lineBalance = (a) => Store.balanceOf(a.id, range);
 
   const expenseList = Store.db.accounts
     .filter((a) => a.group === 'Expenses')
     .map((a) => ({ a, bal: lineBalance(a) }))
-    .filter((x) => Math.abs(x.bal) > 0.005)
+    .filter((x) => round2(x.bal) !== 0)
     .sort((a, b) => a.a.name.localeCompare(b.a.name));
   const incomeList = Store.db.accounts
     .filter((a) => a.group === 'Income')
     .map((a) => ({ a, bal: lineBalance(a) }))
-    .filter((x) => Math.abs(x.bal) > 0.005)
+    .filter((x) => round2(x.bal) !== 0)
     .sort((a, b) => a.a.name.localeCompare(b.a.name));
-
-  for (const x of expenseList) expTotal += x.bal;
-  for (const x of incomeList) incTotal += x.bal;
-  const profit = incTotal - expTotal;
 
   const expRows = expenseList
     .map((x) => `<tr><td>${esc(x.a.name)}</td><td class="num">${fmt(x.bal)}</td></tr>`)
@@ -1197,88 +1265,136 @@ function renderPLStatement() {
     .map((x) => `<tr><td>${esc(x.a.name)}</td><td class="num">${fmt(x.bal)}</td></tr>`)
     .join('');
 
+  // T-shaped presentation: the lighter side carries a single Net row "after
+  // all items" so both panels end on the same grand total — a Loss appears in
+  // the Income section, a Profit in the Expenses section. With a broken-even
+  // book there is no Net row at all; both bars still agree (₹0.00 or equal).
+  const brokeEven = Math.abs(profit) < 0.005;
+  const grand = round2(Math.max(incTotal, expTotal));
+  const netRow = brokeEven
+    ? ''
+    : `<tr class="rpt-subtotal" data-total-net="${num2(profit)}">
+        <td>Net ${profit >= 0 ? 'Profit' : 'Loss'}</td>
+        <td class="num ${profit < 0 ? 'text-red' : 'text-green'}">${fmt(Math.abs(profit))}</td>
+      </tr>`;
+  const incomeBarTitle =
+    'Income ' + fmt(incTotal) + (profit < 0 ? ' + Net Loss ' + fmt(Math.abs(profit)) : '');
+  const expenseBarTitle = 'Expenses ' + fmt(expTotal) + (profit > 0 ? ' + Net Profit ' + fmt(profit) : '');
+
   $('#reportBody').innerHTML = `
     <div class="rpt-wrap">
       <div class="rpt-header">
         <div class="rpt-title">Profit &amp; Loss</div>
         <div class="rpt-sub">${esc(periodLabel())}</div>
       </div>
-      <div class="rpt-card">
-        <table class="rpt-table">
-          <thead>
-            <tr>
-              <th class="th-left">Account</th>
-              <th class="th-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr class="rpt-section"><td colspan="2">Expenses</td></tr>
-            ${expRows || '<tr><td colspan="2" class="rpt-empty">No expenses</td></tr>'}
-            <tr class="rpt-subtotal"><td>Total Expenses</td><td class="num">${fmt(expTotal)}</td></tr>
-            <tr class="rpt-section"><td colspan="2">Income</td></tr>
-            ${incRows || '<tr><td colspan="2" class="rpt-empty">No income</td></tr>'}
-            <tr class="rpt-subtotal"><td>Total Income</td><td class="num">${fmt(incTotal)}</td></tr>
-          </tbody>
-          <tfoot>
-            <tr class="rpt-grand">
-              <td>${profit >= 0 ? 'Profit' : 'Loss'}</td>
-              <td class="num">${fmt(Math.abs(profit))}</td>
-            </tr>
-          </tfoot>
-        </table>
+      <div class="rpt-bs-grid">
+        <div class="rpt-bs-panel">
+          <div class="rpt-bs-head"><span>Income</span><span>Amount</span></div>
+          <table class="rpt-bs-table">
+            <tbody>
+              ${incRows || '<tr><td colspan="2" class="rpt-empty">No income</td></tr>'}
+              ${profit < 0 ? netRow : ''}
+            </tbody>
+          </table>
+          <div class="rpt-bs-totals" data-total-income="${num2(grand)}" title="${esc(incomeBarTitle)}"><span>Total</span><span class="num">${fmt(grand)}</span></div>
+        </div>
+        <div class="rpt-bs-panel">
+          <div class="rpt-bs-head"><span>Expenses</span><span>Amount</span></div>
+          <table class="rpt-bs-table">
+            <tbody>
+              ${expRows || '<tr><td colspan="2" class="rpt-empty">No expenses</td></tr>'}
+              ${profit > 0 ? netRow : ''}
+            </tbody>
+          </table>
+          <div class="rpt-bs-totals" data-total-expense="${num2(grand)}" title="${esc(expenseBarTitle)}"><span>Total</span><span class="num">${fmt(grand)}</span></div>
+        </div>
       </div>
     </div>`;
 }
 
 function renderBalanceSheet() {
   const range = asOfRange();
-  const flows = periodFlows(range);
 
   const assets = Store.db.accounts
     .filter((a) => a.group === 'Assets')
     .map((a) => ({ a, amt: Store.balanceOf(a.id, range) }))
-    .filter((x) => Math.abs(x.amt) > 0.005)
+    .filter((x) => round2(x.amt) !== 0)
     .sort((a, b) => a.a.name.localeCompare(b.a.name));
 
   const liabilities = Store.db.accounts
     .filter((a) => a.group === 'Liabilities')
     .map((a) => ({ a, amt: Store.balanceOf(a.id, range) }))
-    .filter((x) => Math.abs(x.amt) > 0.005)
+    .filter((x) => round2(x.amt) !== 0)
     .sort((a, b) => a.a.name.localeCompare(b.a.name));
 
-  let income = 0;
-  let expense = 0;
-  for (const a of Store.db.accounts) {
-    const f = flows[a.id] || { dr: 0, cr: 0 };
-    if (a.group === 'Income') income += f.cr - f.dr;
-    if (a.group === 'Expenses') expense += f.dr - f.cr;
-  }
-  const profit = income - expense;
+  // The P&L effect on the sheet: the same plFigures() net the Profit & Loss
+  // statement prints — one figure by construction, never two near-equal sums.
+  const profit = plFigures(range).net;
 
-  const assetsTotal = assets.reduce((s, x) => s + x.amt, 0);
-  const liabTotal = liabilities.reduce((s, x) => s + x.amt, 0);
+  const assetsTotal = round2(assets.reduce((s, x) => s + x.amt, 0));
+  const liabTotal = round2(liabilities.reduce((s, x) => s + x.amt, 0));
 
-  const assetRows = assets.map((x) => `<tr><td>${esc(x.a.name)}</td><td class="num">${fmt(x.amt)}</td></tr>`).join('');
-  const liabRows = liabilities.map((x) => `<tr><td>${esc(x.a.name)}</td><td class="num">${fmt(x.amt)}</td></tr>`).join('');
+  const assetRows = assets
+    .map((x) => `<tr><td>${esc(x.a.name)}</td><td class="num">${fmt(x.amt)}</td></tr>`)
+    .join('');
+  const liabRows = liabilities
+    .map((x) => `<tr><td>${esc(x.a.name)}</td><td class="num">${fmt(x.amt)}</td></tr>`)
+    .join('');
+
+  // Opening-difference ("Suspense A/c") line: every voucher is self-balancing,
+  // so any gap between the two panels comes solely from an unbalanced opening
+  // set. Standard treatment (Tally & co.) is to surface it as its own line so
+  // the Balance Sheet balances for real while the anomaly stays visible and
+  // correctable — never hidden inside another figure.
+  const capitalTotal = round2(liabTotal + profit);
+  const suspense = round2(assetsTotal - capitalTotal);
+  const showSuspense = Math.abs(suspense) >= 0.005;
+  const rightTotal = round2(capitalTotal + (showSuspense ? suspense : 0));
+
+  const plRow = `
+              <tr class="rpt-subtotal" data-total-net="${num2(profit)}">
+                <td>Profit &amp; Loss A/c (${profit >= 0 ? 'Profit' : 'Loss'})</td>
+                <td class="num ${profit < 0 ? 'text-red' : ''}">${fmt(profit)}</td>
+              </tr>`;
+
+  const suspenseRow = showSuspense
+    ? `
+              <tr class="rpt-subtotal" data-total-suspense="${num2(suspense)}" title="Opening entries did not balance (vouchers can never create this gap). Post one opening entry to clear this difference.">
+                <td>Opening Difference (Suspense A/c)</td>
+                <td class="num ${suspense < 0 ? 'text-red' : ''}">${fmt(suspense)}</td>
+              </tr>`
+    : '';
+
+  // Same out-of-balance surface as the Trial Balance: the sheet's totals only
+  // agree because the Suspense line absorbs the opening difference — the
+  // banner states the bare gap at the very top so it can't slip past unnoticed.
+  const bsBanner = showSuspense
+    ? `<div class="rpt-banner" role="alert" data-total-diff="${num2(suspense)}">
+          <div class="rpt-banner-body">
+            <strong>Out of balance by ${fmt(Math.abs(suspense))}</strong>
+            <span>${suspense < 0 ? 'Liabilities &amp; Equity exceed Assets' : 'Assets exceed Liabilities &amp; Equity'} by ${fmt(Math.abs(suspense))}. Vouchers cannot create this gap — it comes from the opening balances — and is shown as Opening Difference (Suspense A/c) below so both totals agree. Post one corrective opening entry to clear it.</span>
+          </div>
+        </div>`
+    : '';
 
   $('#reportBody').innerHTML = `
     <div class="rpt-wrap">
+      ${bsBanner}
       <div class="rpt-header">
         <div class="rpt-title">Balance Sheet</div>
         <div class="rpt-sub">As on ${esc(range ? fmtDate(range.to) : fmtDate(todayISO()))}</div>
       </div>
       <div class="rpt-bs-grid">
         <div class="rpt-bs-panel">
-          <div class="rpt-bs-head"><span>Liabilities</span><span>Amount</span></div>
+          <div class="rpt-bs-head"><span>Liabilities &amp; Equity</span><span>Amount</span></div>
           <table class="rpt-bs-table">
             <tbody>
               ${liabRows || '<tr><td colspan="2" class="rpt-empty">No liabilities</td></tr>'}
-              <tr><td>Capital (${profit >= 0 ? 'Profit' : 'Loss'})</td><td class="num">${fmt(Math.abs(profit))}</td></tr>
+              ${plRow}
+              ${suspenseRow}
             </tbody>
-            <tfoot>
-              <tr class="rpt-grand"><td>Total</td><td class="num">${fmt(liabTotal + profit)}</td></tr>
-            </tfoot>
           </table>
+          <div class="rpt-bs-totals" data-total-liabilities="${num2(rightTotal)}"><span>Total</span><span class="num">${fmt(rightTotal)}</span></div>
         </div>
         <div class="rpt-bs-panel">
           <div class="rpt-bs-head"><span>Assets</span><span>Amount</span></div>
@@ -1286,112 +1402,9 @@ function renderBalanceSheet() {
             <tbody>
               ${assetRows || '<tr><td colspan="2" class="rpt-empty">No assets</td></tr>'}
             </tbody>
-            <tfoot>
-              <tr class="rpt-grand"><td>Total</td><td class="num">${fmt(assetsTotal)}</td></tr>
-            </tfoot>
           </table>
+          <div class="rpt-bs-totals" data-total-assets="${num2(assetsTotal)}"><span>Total</span><span class="num">${fmt(assetsTotal)}</span></div>
         </div>
-      </div>
-    </div>`;
-}
-
-function renderCashFlowStatement() {
-  const range = reportRange();
-  const from = range ? range.from : null;
-  const to = range ? range.to : null;
-  const cf = cashFlowStatement(Store.db.accounts, Store.db.vouchers, range);
-
-  const isCashAcc = (a) => a.group === 'Assets' && isLiquid(a);
-  const cashAccounts = Store.db.accounts.filter(isCashAcc);
-  const openingCash = from
-    ? cashAccounts.reduce((s, a) => s + Store.balanceOf(a.id, { to: prevDate(from) }), 0)
-    : cashAccounts.reduce((s, a) => s + (Number(a.opening) || 0), 0);
-  const closingCash = cashAccounts.reduce((s, a) => s + Store.balanceOf(a.id, to ? { to } : {}), 0);
-
-  const opRows = cf.operating
-    .map(
-      (l) => `
-        <tr>
-          <td class="rpt-part">${esc(l.name)}</td>
-          <td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td>
-        </tr>`
-    )
-    .join('');
-
-  const invRows = cf.investing
-    .map(
-      (l) => `
-        <tr>
-          <td class="rpt-part">${esc(l.name)}</td>
-          <td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td>
-        </tr>`
-    )
-    .join('');
-
-  const finRows = cf.financing
-    .map(
-      (l) => `
-        <tr>
-          <td class="rpt-part">${esc(l.name)}</td>
-          <td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td>
-        </tr>`
-    )
-    .join('');
-
-  $('#reportBody').innerHTML = `
-    <div class="rpt-wrap">
-      <div class="rpt-header">
-        <div class="rpt-title">Cash Flow Statement</div>
-        <div class="rpt-sub">For the period ${esc(periodLabel())}</div>
-      </div>
-      <div class="rpt-card">
-        <table class="rpt-cf-table">
-          <thead>
-            <tr>
-              <th class="th-left">Particulars</th>
-              <th class="th-right">Amount (₹)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr class="rpt-section"><td colspan="2">A. Cash Flow from Operating Activities</td></tr>
-            <tr>
-              <td class="rpt-part">Net Profit / (Loss) as per Profit &amp; Loss Account</td>
-              <td class="num ${cf.netProfit < 0 ? 'text-red' : ''}">${fmt(cf.netProfit)}</td>
-            </tr>
-            ${opRows}
-            <tr class="rpt-subtotal">
-              <td>Net Cash generated from Operating Activities (A)</td>
-              <td class="num ${cf.cfo < 0 ? 'text-red' : ''}">${fmt(cf.cfo)}</td>
-            </tr>
-            <tr class="rpt-section"><td colspan="2">B. Cash Flow from Investing Activities</td></tr>
-            ${invRows || '<tr><td colspan="2" class="rpt-empty">No investing activities</td></tr>'}
-            <tr class="rpt-subtotal">
-              <td>Net Cash used in / generated from Investing Activities (B)</td>
-              <td class="num ${cf.cfi < 0 ? 'text-red' : ''}">${fmt(cf.cfi)}</td>
-            </tr>
-            <tr class="rpt-section"><td colspan="2">C. Cash Flow from Financing Activities</td></tr>
-            ${finRows || '<tr><td colspan="2" class="rpt-empty">No financing activities</td></tr>'}
-            <tr class="rpt-subtotal">
-              <td>Net Cash used in / generated from Financing Activities (C)</td>
-              <td class="num ${cf.cff < 0 ? 'text-red' : ''}">${fmt(cf.cff)}</td>
-            </tr>
-            <tr class="rpt-section"><td colspan="2">Net Increase / (Decrease) in Cash &amp; Cash Equivalents (A+B+C)</td></tr>
-            <tr>
-              <td class="rpt-part">Net Increase / (Decrease) in Cash &amp; Bank Balances</td>
-              <td class="num ${cf.netCash < 0 ? 'text-red' : ''}">${fmt(cf.netCash)}</td>
-            </tr>
-            <tr>
-              <td class="rpt-part">Add: Opening Cash &amp; Bank Balances</td>
-              <td class="num">${fmt(openingCash)}</td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr class="rpt-grand">
-              <td>Closing Cash &amp; Bank Balances</td>
-              <td class="num">${fmt(closingCash)}</td>
-            </tr>
-          </tfoot>
-        </table>
       </div>
     </div>`;
 }
@@ -1489,71 +1502,112 @@ function renderCurrent() {
   if (state.ledgerId && !$('#ledgerOverlay').hidden) renderLedger();
 }
 
-
 function renderCashFlowStatementImproved() {
   const range = reportRange();
   const from = range ? range.from : null;
   const to = range ? range.to : null;
 
-  const isCashAcc = (a) => a.group === 'Assets' && isLiquid(a);
+  // Use the proper cashFlowStatement calculation from ledger-core for accurate categorization
+  const cf = cashFlowStatement(Store.db.accounts, Store.db.vouchers, { from, to });
+
+  // Cash & cash equivalents = asset accounts typed Cash/Bank. The `liquid`
+  // flag is a ledger-entry hint and must not redefine what counts as cash here
+  // (real books carry stale liquid=1 flags on receivables) — the dashboard's
+  // Cash & Bank card uses the same definition, so the two always agree.
+  const isCashAcc = (a) => a.group === 'Assets' && isLiquidType(a.type);
   const cashAccounts = Store.db.accounts.filter(isCashAcc);
-  const openingCash = from
-    ? cashAccounts.reduce((s, a) => s + Store.balanceOf(a.id, { to: prevDate(from) }), 0)
-    : cashAccounts.reduce((s, a) => s + (Number(a.opening) || 0), 0);
-  const closingCash = cashAccounts.reduce((s, a) => s + Store.balanceOf(a.id, to ? { to } : {}), 0);
+  // Opening/closing are the reconciliation anchors of this statement — round
+  // them once (round2) so the printed identity (A+B+C) + Opening = Closing can
+  // never be visually off by a paisa of float dust.
+  const openingCash = round2(
+    from
+      ? cashAccounts.reduce((s, a) => s + Store.balanceOf(a.id, { to: prevDate(from) }), 0)
+      : cashAccounts.reduce((s, a) => s + (Number(a.opening) || 0), 0)
+  );
+  const closingCash = round2(cashAccounts.reduce((s, a) => s + Store.balanceOf(a.id, to ? { to } : {}), 0));
 
-  const inRows = [];
-  const outRows = [];
+  // Build operating activities rows from cashFlowStatement results
+  const opRows =
+    (cf.operating || [])
+      .map(
+        (l) =>
+          `<tr><td class="rpt-part">${esc(l.name)}</td><td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td></tr>`
+      )
+      .join('') || '<tr><td colspan="2" class="rpt-empty">No operating activities</td></tr>';
 
-  for (const v of Store.db.vouchers) {
-    if (range && range.from && v.date < range.from) continue;
-    if (range && range.to && v.date > range.to) continue;
-    const drAcc = Store.account(v.dr);
-    const crAcc = Store.account(v.cr);
-    const isDrCash = drAcc && isCashAcc(drAcc);
-    const isCrCash = crAcc && isCashAcc(crAcc);
-    if (isDrCash && !isCrCash) inRows.push({ name: crAcc?.name || 'Received', amt: v.amount });
-    if (isCrCash && !isDrCash) outRows.push({ name: drAcc?.name || 'Paid', amt: v.amount });
-  }
+  // Build investing activities rows
+  const invRows =
+    (cf.investing || [])
+      .map(
+        (l) =>
+          `<tr><td class="rpt-part">${esc(l.name)}</td><td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td></tr>`
+      )
+      .join('') || '<tr><td colspan="2" class="rpt-empty">No investing activities</td></tr>';
 
-  const inTotal = inRows.reduce((s, x) => s + x.amt, 0);
-  const outTotal = outRows.reduce((s, x) => s + x.amt, 0);
-  const net = closingCash - openingCash;
+  // Build financing activities rows
+  const finRows =
+    (cf.financing || [])
+      .map(
+        (l) =>
+          `<tr><td class="rpt-part">${esc(l.name)}</td><td class="num ${l.amount < 0 ? 'text-red' : ''}">${fmt(l.amount)}</td></tr>`
+      )
+      .join('') || '<tr><td colspan="2" class="rpt-empty">No financing activities</td></tr>';
 
-  const inHtml = inRows.map((x) => `<tr><td>${esc(x.name)}</td><td class="num">${fmt(x.amt)}</td></tr>`).join('');
-  const outHtml = outRows.map((x) => `<tr><td>${esc(x.name)}</td><td class="num">${fmt(x.amt)}</td></tr>`).join('');
-
+  // Same two-panel format as the Balance Sheet and the P&L: the left panel is
+  // the movement itself (A/B/C activities with their detail lines, ending on a
+  // pinned Net-change bar), the right panel reconciles the position (Opening
+  // → Net change → pinned Closing bar). One figure per hook, once, so the
+  // data-total-* instrumentation of the suites reads exactly what is printed.
   $('#reportBody').innerHTML = `
     <div class="rpt-wrap">
       <div class="rpt-header">
-        <div class="rpt-title">Cash Flow</div>
-        <div class="rpt-sub">${esc(periodLabel())}</div>
+        <div class="rpt-title">Cash Flow Statement</div>
+        <div class="rpt-sub">For the period ${esc(periodLabel())}</div>
       </div>
-      <div class="rpt-card">
-        <table class="rpt-table">
-          <thead>
-            <tr>
-              <th class="th-left">Account</th>
-              <th class="th-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr class="rpt-section"><td colspan="2">Money In</td></tr>
-            ${inHtml || '<tr><td colspan="2" class="rpt-empty">No cash received</td></tr>'}
-            <tr class="rpt-subtotal"><td>Total Money In</td><td class="num">${fmt(inTotal)}</td></tr>
-            <tr class="rpt-section"><td colspan="2">Money Out</td></tr>
-            ${outHtml || '<tr><td colspan="2" class="rpt-empty">No cash paid</td></tr>'}
-            <tr class="rpt-subtotal"><td>Total Money Out</td><td class="num">${fmt(outTotal)}</td></tr>
-            <tr><td>Opening Cash/Bank</td><td class="num">${fmt(openingCash)}</td></tr>
-            <tr><td>Closing Cash/Bank</td><td class="num">${fmt(closingCash)}</td></tr>
-          </tbody>
-          <tfoot>
-            <tr class="rpt-grand">
-              <td>Net Change</td>
-              <td class="num">${fmt(net)}</td>
-            </tr>
-          </tfoot>
-        </table>
+      <div class="rpt-bs-grid">
+        <div class="rpt-bs-panel">
+          <div class="rpt-bs-head"><span>Cash Movement</span><span>Amount</span></div>
+          <table class="rpt-bs-table">
+            <tbody>
+              ${opRows}
+              <tr class="rpt-subtotal" data-total-cfo="${num2(cf.cfo)}">
+                <td>Net Cash from Operating Activities (A)</td>
+                <td class="num ${cf.cfo < 0 ? 'text-red' : ''}">${fmt(cf.cfo)}</td>
+              </tr>
+              ${invRows}
+              <tr class="rpt-subtotal" data-total-cfi="${num2(cf.cfi)}">
+                <td>Net Cash from Investing Activities (B)</td>
+                <td class="num ${cf.cfi < 0 ? 'text-red' : ''}">${fmt(cf.cfi)}</td>
+              </tr>
+              ${finRows}
+              <tr class="rpt-subtotal" data-total-cff="${num2(cf.cff)}">
+                <td>Net Cash from Financing Activities (C)</td>
+                <td class="num ${cf.cff < 0 ? 'text-red' : ''}">${fmt(cf.cff)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="rpt-bs-totals" data-total-netcash="${num2(cf.netCash)}" title="Operating + Investing + Financing (${fmt(cf.cfo)} ${cf.cfi < 0 ? '−' : '+'} ${fmt(Math.abs(cf.cfi))} ${cf.cff < 0 ? '−' : '+'} ${fmt(Math.abs(cf.cff))})">
+            <span>Net Change in Cash (A+B+C)</span><span class="num ${cf.netCash < 0 ? 'text-red' : ''}">${fmt(cf.netCash)}</span>
+          </div>
+        </div>
+        <div class="rpt-bs-panel">
+          <div class="rpt-bs-head"><span>Cash &amp; Bank</span><span>Amount</span></div>
+          <table class="rpt-bs-table">
+            <tbody>
+              <tr data-total-cash-open="${num2(openingCash)}">
+                <td class="rpt-part">Opening Cash &amp; Bank Balances</td>
+                <td class="num">${fmt(openingCash)}</td>
+              </tr>
+              <tr>
+                <td class="rpt-part">Net Change in Cash (A+B+C)</td>
+                <td class="num ${cf.netCash < 0 ? 'text-red' : ''}">${fmt(cf.netCash)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="rpt-bs-totals" data-total-cash-close="${num2(closingCash)}" title="Opening + Net change (${fmt(openingCash)} + ${fmt(cf.netCash)})">
+            <span>Cash at Close</span><span class="num ${closingCash < 0 ? 'text-red' : ''}">${fmt(closingCash)}</span>
+          </div>
+        </div>
       </div>
     </div>`;
 }

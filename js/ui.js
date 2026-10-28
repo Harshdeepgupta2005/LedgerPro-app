@@ -24,7 +24,8 @@ function fmtCompact(amount) {
   else if (n >= 100000) s = `${(n / 100000).toFixed(2)} L`;
   else if (n >= 1000) s = `${(n / 1000).toFixed(1)}K`;
   else s = `${Math.round(n)}`;
-  return `${neg ? '-' : ''}₹${s}`;
+  // A sub-paisa negative rounds to "0" — printing "-₹0" would look wrong.
+  return `${neg && Number(s) !== 0 ? '-' : ''}₹${s}`;
 }
 
 function fmtDate(iso) {
@@ -126,6 +127,9 @@ function toast(message, type = 'success') {
 let modalStart = null;
 
 function openModal(id) {
+  // A search-results panel opened from the topbar must never linger above a
+  // modal (the panel is a body-level fixed element with a very high z-index).
+  if (typeof hideGlobalResults === 'function') hideGlobalResults();
   const m = $('#' + id);
   m.hidden = false;
   modalStart = document.activeElement;
