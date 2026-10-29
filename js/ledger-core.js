@@ -269,6 +269,77 @@ function rupeesInWords(n) {
   return out.trim();
 }
 
+// Fingerprint of the built-in sample book that releases through 1.7.x auto-seeded
+// into every fresh install (and immediately persisted it). Books matching this
+// EXACTLY contain zero user-entered data, so isSeededSampleBook() lets the app
+// clear them once on upgrade — making fresh installs boot totally empty.
+// Note the sample is date-relative (generated at first-run time), so the check
+// compares only stable facts: account identities and the narration multiset.
+const SAMPLE_BOOK_FINGERPRINT = (() => {
+  const accounts = {
+    acc1: { name: 'Cash in Hand', group: 'Assets', type: 'Cash', opening: 85000 },
+    acc2: { name: 'HDFC Bank — Current A/c', group: 'Assets', type: 'Bank', opening: 485000 },
+    acc3: { name: 'Sundry Debtors', group: 'Assets', type: 'Receivable', opening: 120000 },
+    acc4: { name: 'Sundry Creditors', group: 'Liabilities', type: 'Payable', opening: 95000 },
+    acc5: { name: "Owner's Capital", group: 'Liabilities', type: 'Other', opening: 595000 },
+    acc6: { name: 'Sales', group: 'Income', type: 'Other', opening: 0 },
+    acc7: { name: 'Interest Income', group: 'Income', type: 'Other', opening: 0 },
+    acc8: { name: 'Purchases', group: 'Expenses', type: 'Other', opening: 0 },
+    acc9: { name: 'Rent', group: 'Expenses', type: 'Other', opening: 0 },
+    acc10: { name: 'Salaries', group: 'Expenses', type: 'Other', opening: 0 },
+    acc11: { name: 'Internet & Utilities', group: 'Expenses', type: 'Other', opening: 0 },
+  };
+  const narr = {};
+  const add = (key, n) => {
+    narr[key] = n;
+  };
+  add('Office rent', 6);
+  add('Monthly salaries', 6);
+  add('Received from Gupta Textiles', 6);
+  for (let i = 0; i <= 5; i++) add(`Sales invoice #${1040 + i}`, 1);
+  add('Internet & electricity', 6);
+  add('Purchase from Sharma Supplies', 6);
+  add('Cash deposited to bank', 3);
+  add('Paid to Sharma Supplies', 3);
+  add('Bank interest credited', 2);
+  return {
+    accountCount: Object.keys(accounts).length,
+    accounts,
+    voucherCount: 44,
+    narrations: narr,
+  };
+})();
+
+function isSeededSampleBook(doc) {
+  if (!doc || !Array.isArray(doc.accounts) || !Array.isArray(doc.vouchers)) return false;
+  const fp = SAMPLE_BOOK_FINGERPRINT;
+  if (doc.accounts.length !== fp.accountCount) return false;
+  if (doc.vouchers.length !== fp.voucherCount) return false;
+  const byId = new Map(doc.accounts.map((a) => [a && a.id, a]));
+  for (const id of Object.keys(fp.accounts)) {
+    const seed = fp.accounts[id];
+    const a = byId.get(id);
+    if (!a) return false;
+    if (
+      a.name !== seed.name ||
+      a.group !== seed.group ||
+      a.type !== seed.type ||
+      (Number(a.opening) || 0) !== seed.opening
+    )
+      return false;
+  }
+  const narrCounts = new Map();
+  for (const v of doc.vouchers) {
+    const key = String(v && v.narration ? v.narration : '');
+    if (!Object.prototype.hasOwnProperty.call(fp.narrations, key)) return false;
+    narrCounts.set(key, (narrCounts.get(key) || 0) + 1);
+  }
+  for (const key of Object.keys(fp.narrations)) {
+    if (narrCounts.get(key) !== fp.narrations[key]) return false;
+  }
+  return true;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     leadingNumber,
@@ -290,5 +361,6 @@ if (typeof module !== 'undefined' && module.exports) {
     thisMonthKey,
     numToWords,
     rupeesInWords,
+    isSeededSampleBook,
   };
 }

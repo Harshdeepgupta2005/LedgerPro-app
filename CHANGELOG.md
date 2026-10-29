@@ -2,6 +2,24 @@
 
 All notable changes to LedgerPro are documented here. Semantic versioning.
 
+## [1.7.2] - 2026-10-29
+
+### Changed
+
+- **Fresh installs now boot totally empty** — no sample data. Releases through
+  1.7.x auto-seeded a demo book (11 accounts, 44 vouchers) into every new
+  installation and persisted it as if it were real data. Books that match that
+  sample exactly (meaning nothing was ever entered) are cleared once on
+  upgrade, with a notice. Dev runners (`LEDGERPRO_DEV=1`, unpackaged only)
+  still demo their real snapshot; the sample generator lives on as the smoke
+  test fixture (`scripts/smoke-fixture.js`) and is no longer shipped in the app.
+
+### Fixed
+
+- A brand-new install's footer claimed "LocalStorage mode" although it saves
+  to SQLite from the very first run; the storage label now reports the real
+  backend in every boot path.
+
 ## [1.7.1] - 2026-10-29
 
 ### Added

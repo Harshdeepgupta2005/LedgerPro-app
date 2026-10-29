@@ -1,11 +1,10 @@
 // Verifies the dev-mode demo seed wiring:
 //   LEDGERPRO_DEV=1 (non-packaged) → preload window.ledger.devSeed
-//   → js/data.js seedSampleData() must boot the REAL ledger snapshot from
-//     js/real-seed.js (not the synthetic sample books).
-//
-// The negative case (no LEDGERPRO_DEV → sample boots, 11 accounts / 45
-// vouchers) is continuously proven by `npm run smoke`, which sets only
-// LEDGERPRO_SMOKE.
+//   → js/data.js freshBook() must boot the REAL ledger snapshot from
+//     js/real-seed.js (identical to what the user sees, and the only way a
+//     dev runner gets data — fresh books are EMPTY since 1.7.2; the old
+//     auto-seeded sample book no longer exists and seated copies are cleared
+//     by isSeededSampleBook() on upgrade).
 //
 // Run: npx electron scripts/test-devseed.js   (self-cleaning temp userData)
 

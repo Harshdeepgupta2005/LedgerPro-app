@@ -48,6 +48,20 @@ function clearBackup() {
   }
 }
 
+// Clear-on-upgrade: releases through 1.7.x auto-seeded a sample book into
+// every fresh install and immediately persisted it. A book matching that
+// sample EXACTLY holds nothing the user ever entered, so replace it with an
+// empty book on first boot (one-time cleanup, surfaced with a notice).
+// Returns the book unchanged when it is not the seeded sample.
+function withoutSeedSample(book) {
+  if (!isSeededSampleBook(book)) return book;
+  console.info('Built-in sample book detected and cleared (one-time upgrade cleanup).');
+  if (typeof Store !== 'undefined' && typeof Store.warn === 'function') {
+    Store.warn('Built-in sample data cleared — your book now starts empty.', 'error');
+  }
+  return freshBook();
+}
+
 const Store = {
   db: null,
   backend: 'localstorage',
@@ -90,8 +104,18 @@ const Store = {
           const local = readBackup();
           const hasBooks = doc.accounts.length > 0 || doc.vouchers.length > 0;
           if (doc.initialized || hasBooks) {
+            // Clear-on-upgrade applies to the disk copy…
+            if (hasBooks && isSeededSampleBook(doc)) {
+              this.db = withoutSeedSample(doc);
+              this.backend = 'sqlite';
+              this.rebuildSeqs();
+              this.save();
+              return this.db;
+            }
             if (local && local.savedAt && doc.savedAt && local.savedAt > doc.savedAt) {
-              this.db = local.db;
+              // …and to a newer localStorage recovery copy that is itself the
+              // old sample (the packaged 1.7.x app wrote its seed to storage too).
+              this.db = withoutSeedSample(local.db);
               this.backend = 'localstorage';
               this.rebuildSeqs();
               this.warn('You had unsaved local changes — they have been restored.', 'error');
@@ -107,13 +131,14 @@ const Store = {
             return this.db;
           }
           if (local) {
-            this.db = local.db;
+            this.db = withoutSeedSample(local.db);
             this.backend = 'sqlite';
             this.rebuildSeqs();
             this.save();
             return this.db;
           }
-          this.db = seedSampleData();
+          this.db = freshBook();
+          if (this.hasDiskBackend()) this.backend = 'sqlite';
           this.rebuildSeqs();
           this.save();
           return this.db;
@@ -134,14 +159,14 @@ const Store = {
 
     const legacy = readBackup();
     if (legacy) {
-      this.db = legacy.db;
-      this.backend = 'sqlite';
+      this.db = withoutSeedSample(legacy.db);
+      if (this.hasDiskBackend()) this.backend = 'sqlite';
       this.rebuildSeqs();
       this.save();
       return this.db;
     }
 
-    this.db = seedSampleData();
+    this.db = freshBook();
     this.rebuildSeqs();
     this.save();
     return this.db;
@@ -203,7 +228,7 @@ const Store = {
   },
 
   reset() {
-    this.db = seedSampleData();
+    this.db = freshBook();
     this.rebuildSeqs();
     this.save();
     return this.db;
@@ -300,25 +325,17 @@ function compareVoucherOrder(a, b) {
   );
 }
 
-function isoDate(monthsBack, day) {
-  const now = new Date();
-  const today = now.getDate();
-  const d = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
-  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  const targetDay = monthsBack === 0 ? Math.min(day, today) : Math.min(day, lastDay);
-  d.setDate(Math.max(1, targetDay));
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
-
-function seedSampleData() {
-  // Dev mode only (LEDGERPRO_DEV=1, gated through main → preload as
-  // window.ledger.devSeed; packaged builds can never set it): demo the real
-  // ledger snapshot exported by scripts/export-real-seed.js into js/real-seed.js
-  // instead of the synthetic sample books. Every seeding path — fresh load,
-  // localStorage restore and Store.reset() — flows through this function, and
-  // each caller runs rebuildSeqs() afterwards, so ids/numbering stay canonical.
+function freshBook() {
+  // Fresh installs start EMPTY: no accounts, no vouchers. Releases through
+  // 1.7.x instead auto-seeded a sample book and persisted it, so the app
+  // looked pre-loaded with demo data on first run.
+  //
+  // Dev mode is the one exception (LEDGERPRO_DEV=1, gated through main →
+  // preload as window.ledger.devSeed; packaged builds can never set it): demo
+  // the real ledger snapshot exported by scripts/export-real-seed.js into
+  // js/real-seed.js. Every boot path — fresh load, localStorage restore and
+  // Store.reset() — flows through this function, and each caller runs
+  // rebuildSeqs() afterwards, so ids/numbering stay canonical.
   if (typeof window !== 'undefined' && window.ledger && window.ledger.devSeed) {
     const src = globalThis.LEDGERPRO_REAL_SEED;
     if (src && Array.isArray(src.accounts) && Array.isArray(src.vouchers)) {
@@ -328,144 +345,8 @@ function seedSampleData() {
       };
     }
     console.error(
-      'Dev seed requested (LEDGERPRO_DEV=1) but no real-seed.js snapshot was found — falling back to sample data.'
+      'Dev seed requested (LEDGERPRO_DEV=1) but no real-seed.js snapshot was found — starting with an empty book.'
     );
   }
-  const accounts = [
-    {
-      id: 'acc1',
-      name: 'Cash in Hand',
-      group: 'Assets',
-      type: 'Cash',
-      category: 'Current Assets',
-      opening: 85000,
-    },
-    {
-      id: 'acc2',
-      name: 'HDFC Bank — Current A/c',
-      group: 'Assets',
-      type: 'Bank',
-      category: 'Current Assets',
-      opening: 485000,
-    },
-    {
-      id: 'acc3',
-      name: 'Sundry Debtors',
-      group: 'Assets',
-      type: 'Receivable',
-      category: 'Current Assets',
-      opening: 120000,
-    },
-    {
-      id: 'acc4',
-      name: 'Sundry Creditors',
-      group: 'Liabilities',
-      type: 'Payable',
-      category: 'Current Liabilities',
-      opening: 95000,
-    },
-    {
-      id: 'acc5',
-      name: "Owner's Capital",
-      group: 'Liabilities',
-      type: 'Other',
-      category: 'Equity',
-      opening: 595000,
-    },
-    {
-      id: 'acc6',
-      name: 'Sales',
-      group: 'Income',
-      type: 'Other',
-      category: 'Revenue from Operations',
-      opening: 0,
-    },
-    {
-      id: 'acc7',
-      name: 'Interest Income',
-      group: 'Income',
-      type: 'Other',
-      category: 'Other Income',
-      opening: 0,
-    },
-    {
-      id: 'acc8',
-      name: 'Purchases',
-      group: 'Expenses',
-      type: 'Other',
-      category: 'Cost of Materials & Purchases',
-      opening: 0,
-    },
-    { id: 'acc9', name: 'Rent', group: 'Expenses', type: 'Other', category: 'Other Expenses', opening: 0 },
-    {
-      id: 'acc10',
-      name: 'Salaries',
-      group: 'Expenses',
-      type: 'Other',
-      category: 'Employee Benefits',
-      opening: 0,
-    },
-    {
-      id: 'acc11',
-      name: 'Internet & Utilities',
-      group: 'Expenses',
-      type: 'Other',
-      category: 'Other Expenses',
-      opening: 0,
-    },
-  ];
-
-  const raw = [];
-  const push = (monthsBack, day, type, dr, cr, amount, narration) => {
-    raw.push({ date: isoDate(monthsBack, day), type, dr, cr, amount, narration });
-  };
-
-  for (let m = 5; m >= 0; m--) {
-    push(m, 3, 'Payment', 'acc9', 'acc1', 18500, 'Office rent');
-    push(m, 6, 'Payment', 'acc10', 'acc2', 38000, 'Monthly salaries');
-    push(
-      m,
-      9,
-      'Receipt',
-      m % 2 === 0 ? 'acc2' : 'acc1',
-      'acc3',
-      45000 + m * 2500,
-      'Received from Gupta Textiles'
-    );
-    push(
-      m,
-      12,
-      'Journal',
-      m % 2 === 0 ? 'acc2' : 'acc3',
-      'acc6',
-      82000 + m * 4500,
-      `Sales invoice #${1040 + (5 - m)}`
-    );
-    push(m, 15, 'Payment', 'acc11', 'acc2', 4200 + (5 - m) * 180, 'Internet & electricity');
-    push(m, 18, 'Payment', 'acc8', 'acc4', 24000 + m * 800, 'Purchase from Sharma Supplies');
-    if (m % 2 === 0) {
-      push(m, 21, 'Contra', 'acc2', 'acc1', 20000, 'Cash deposited to bank');
-    } else {
-      push(m, 24, 'Payment', 'acc4', 'acc2', 35000, 'Paid to Sharma Supplies');
-    }
-    if (m === 0 || m === 3) {
-      push(m, 26, 'Receipt', 'acc2', 'acc7', 4200, 'Bank interest credited');
-    }
-  }
-
-  raw.sort((a, b) => a.date.localeCompare(b.date));
-
-  const counters = {};
-  const vouchers = raw.map((v, i) => {
-    counters[v.type] = (counters[v.type] || 0) + 1;
-    const prefix = voucherNumberPrefix(v.type);
-    return {
-      id: 'v' + (i + 1),
-      no: `${prefix}-${String(counters[v.type]).padStart(4, '0')}`,
-      createdAt: new Date(new Date(`${v.date}T09:00:00`).getTime() + i * 60000).toISOString(),
-      ...v,
-    };
-  });
-
-  return { accounts, vouchers };
+  return { accounts: [], vouchers: [], seqs: { voucher: 0, account: 0 } };
 }

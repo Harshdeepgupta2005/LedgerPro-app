@@ -94,6 +94,20 @@ app.whenReady().then(async () => {
   }
   await sleep(400);
 
+  // The app boots EMPTY since 1.7.2 (fresh installs no longer auto-seed a
+  // sample book). Inject the deterministic book the app itself used to seed,
+  // so the assertions below still exercise real figures, search matches and
+  // suggestions. The fixture is identical to what shipped through 1.7.1.
+  const { sampleBook } = require(path.join(__dirname, 'smoke-fixture.js'));
+  const seeded = await evalIn(`(() => {
+    Store.db = ${JSON.stringify(sampleBook())};
+    Store.rebuildSeqs();
+    Store.save();
+    return Store.db.accounts.length + '/' + Store.db.vouchers.length;
+  })()`);
+  if (seeded !== '11/44') return finish(1, `SMOKE_FAIL fixture seed ${seeded}`);
+  await sleep(600);
+
   const version = app.getVersion();
   if (version !== pkg.version) failures.push(`main version '${version}' != '${pkg.version}'`);
 
