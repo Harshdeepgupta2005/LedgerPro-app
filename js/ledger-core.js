@@ -19,9 +19,11 @@ function isLiquidType(type) {
   return LIQUID_TYPES.includes(type);
 }
 
-// Authoritative liquidity test: the explicit per-account flag wins, otherwise
-// fall back to the account type. Shared by the dashboard, cash-flow statement
-// and the cash-only ledger pickers so they can never disagree.
+// Flag-aware liquidity test used by the cash-only ledger pickers and the
+// "Current liquid" dashboard card. NOTE: report cash definitions (the Cash &
+// Bank card and the cash-flow statement) deliberately use the raw Cash/Bank
+// TYPE instead — real books carry stale liquid=1 flags on receivables — see
+// renderCashFlowStatementImproved() in views.js for the rationale.
 function isLiquidAccount(a) {
   if (!a || typeof a !== 'object') return false;
   if (typeof a.liquid === 'boolean') return a.liquid;

@@ -9,6 +9,22 @@ const isMac = process.platform === 'darwin';
 const isWin = process.platform === 'win32';
 const TOPBAR_H = 80;
 
+// One app instance per book: a second launch would open the same SQLite file
+// concurrently (WAL contention / failed saves). The duplicate launch now just
+// focuses the existing window.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    if (!win.isVisible()) win.show();
+    win.focus();
+  });
+}
+
 let flushDone = false;
 let flushing = null;
 

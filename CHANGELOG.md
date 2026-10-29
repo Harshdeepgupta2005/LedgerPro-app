@@ -2,6 +2,23 @@
 
 All notable changes to LedgerPro are documented here. Semantic versioning.
 
+## [1.7.1] - 2026-10-29
+
+### Added
+
+- **Single-instance lock**: launching a second copy of the app now focuses the
+  existing window instead of opening the same SQLite book concurrently (WAL
+  contention / failed saves)
+
+### Removed
+
+- Dead code purge: ~430 lines of unused CSS (legacy `report-*`, plain `bs-*`,
+  `t-*` T-shaped report family, `rpt-tshape` table, `btn-danger`,
+  `off-balance`, `rpt-cat`/`rpt-diff` leftovers and two unused palette
+  variables) and the unused `typeBadge()` helper; visual-regression screenshots
+  of dashboard, register and all four reports in both themes confirmed no
+  styling changes
+
 ## [1.7.0] - 2026-10-28
 
 ### Changed

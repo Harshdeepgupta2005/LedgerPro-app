@@ -1127,10 +1127,6 @@ function accountsByGroupAndCategory(group) {
   return ordered;
 }
 
-function typeBadge(type) {
-  return type ? badge(type) : '';
-}
-
 function openReport(name) {
   if (!REPORT_META[name]) return;
   state.report = name;
