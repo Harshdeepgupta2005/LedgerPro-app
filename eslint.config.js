@@ -36,6 +36,7 @@ const browserGlobals = {
   prevDate: 'readonly',
   isLiquidType: 'readonly',
   isLiquidAccount: 'readonly',
+  isSeededSampleBook: 'readonly',
   compareVoucherOrder: 'readonly',
   cashFlowStatement: 'readonly',
   ICONS: 'readonly',

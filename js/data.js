@@ -1,8 +1,3 @@
-/* eslint-disable no-unused-vars --
-   Classic multi-script bundle: top-level declarations here are globals shared with
-   views.js/app.js (ESM migration was evaluated and deferred — see Phase 5 notes).
-*/
-
 const DB_KEY = 'ledgerpro.db.v1';
 const BACKUP_V = 2;
 
