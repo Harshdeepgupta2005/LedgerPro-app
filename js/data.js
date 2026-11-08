@@ -127,7 +127,7 @@ const Store = {
           }
           if (local) {
             this.db = withoutSeedSample(local.db);
-            this.backend = 'sqlite';
+            this.backend = 'localstorage';
             this.rebuildSeqs();
             this.save();
             return this.db;

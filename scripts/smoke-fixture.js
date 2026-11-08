@@ -27,6 +27,7 @@ function sampleBook() {
       group: 'Assets',
       type: 'Cash',
       category: 'Current Assets',
+      liquid: true,
       opening: 85000,
     },
     {
@@ -35,6 +36,7 @@ function sampleBook() {
       group: 'Assets',
       type: 'Bank',
       category: 'Current Assets',
+      liquid: true,
       opening: 485000,
     },
     {
@@ -43,6 +45,7 @@ function sampleBook() {
       group: 'Assets',
       type: 'Receivable',
       category: 'Current Assets',
+      liquid: false,
       opening: 120000,
     },
     {
@@ -51,6 +54,7 @@ function sampleBook() {
       group: 'Liabilities',
       type: 'Payable',
       category: 'Current Liabilities',
+      liquid: false,
       opening: 95000,
     },
     {
@@ -59,6 +63,7 @@ function sampleBook() {
       group: 'Liabilities',
       type: 'Other',
       category: 'Equity',
+      liquid: false,
       opening: 595000,
     },
     {
@@ -67,6 +72,7 @@ function sampleBook() {
       group: 'Income',
       type: 'Other',
       category: 'Revenue from Operations',
+      liquid: false,
       opening: 0,
     },
     {
@@ -75,6 +81,7 @@ function sampleBook() {
       group: 'Income',
       type: 'Other',
       category: 'Other Income',
+      liquid: false,
       opening: 0,
     },
     {
@@ -83,15 +90,17 @@ function sampleBook() {
       group: 'Expenses',
       type: 'Other',
       category: 'Cost of Materials & Purchases',
+      liquid: false,
       opening: 0,
     },
-    { id: 'acc9', name: 'Rent', group: 'Expenses', type: 'Other', category: 'Other Expenses', opening: 0 },
+    { id: 'acc9', name: 'Rent', group: 'Expenses', type: 'Other', category: 'Other Expenses', liquid: false, opening: 0 },
     {
       id: 'acc10',
       name: 'Salaries',
       group: 'Expenses',
       type: 'Other',
       category: 'Employee Benefits',
+      liquid: false,
       opening: 0,
     },
     {
@@ -100,6 +109,7 @@ function sampleBook() {
       group: 'Expenses',
       type: 'Other',
       category: 'Other Expenses',
+      liquid: false,
       opening: 0,
     },
   ];

@@ -238,6 +238,9 @@ function save(doc) {
     if (!accountIds.has(String(v.dr)) || !accountIds.has(String(v.cr))) {
       throw new Error(`Voucher ${v.id} references an account that does not exist`);
     }
+    if (String(v.dr) === String(v.cr)) {
+      throw new Error(`Voucher ${v.id} debit and credit accounts must be different`);
+    }
   }
 
   const upsertAccount = db.prepare(

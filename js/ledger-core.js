@@ -277,17 +277,17 @@ function rupeesInWords(n) {
 // compares only stable facts: account identities and the narration multiset.
 const SAMPLE_BOOK_FINGERPRINT = (() => {
   const accounts = {
-    acc1: { name: 'Cash in Hand', group: 'Assets', type: 'Cash', opening: 85000 },
-    acc2: { name: 'HDFC Bank — Current A/c', group: 'Assets', type: 'Bank', opening: 485000 },
-    acc3: { name: 'Sundry Debtors', group: 'Assets', type: 'Receivable', opening: 120000 },
-    acc4: { name: 'Sundry Creditors', group: 'Liabilities', type: 'Payable', opening: 95000 },
-    acc5: { name: "Owner's Capital", group: 'Liabilities', type: 'Other', opening: 595000 },
-    acc6: { name: 'Sales', group: 'Income', type: 'Other', opening: 0 },
-    acc7: { name: 'Interest Income', group: 'Income', type: 'Other', opening: 0 },
-    acc8: { name: 'Purchases', group: 'Expenses', type: 'Other', opening: 0 },
-    acc9: { name: 'Rent', group: 'Expenses', type: 'Other', opening: 0 },
-    acc10: { name: 'Salaries', group: 'Expenses', type: 'Other', opening: 0 },
-    acc11: { name: 'Internet & Utilities', group: 'Expenses', type: 'Other', opening: 0 },
+    acc1: { name: 'Cash in Hand', group: 'Assets', type: 'Cash', category: 'Current Assets', liquid: true, opening: 85000 },
+    acc2: { name: 'HDFC Bank — Current A/c', group: 'Assets', type: 'Bank', category: 'Current Assets', liquid: true, opening: 485000 },
+    acc3: { name: 'Sundry Debtors', group: 'Assets', type: 'Receivable', category: 'Current Assets', liquid: false, opening: 120000 },
+    acc4: { name: 'Sundry Creditors', group: 'Liabilities', type: 'Payable', category: 'Current Liabilities', liquid: false, opening: 95000 },
+    acc5: { name: "Owner's Capital", group: 'Liabilities', type: 'Other', category: 'Equity', liquid: false, opening: 595000 },
+    acc6: { name: 'Sales', group: 'Income', type: 'Other', category: 'Revenue from Operations', liquid: false, opening: 0 },
+    acc7: { name: 'Interest Income', group: 'Income', type: 'Other', category: 'Other Income', liquid: false, opening: 0 },
+    acc8: { name: 'Purchases', group: 'Expenses', type: 'Other', category: 'Cost of Materials & Purchases', liquid: false, opening: 0 },
+    acc9: { name: 'Rent', group: 'Expenses', type: 'Other', category: 'Other Expenses', liquid: false, opening: 0 },
+    acc10: { name: 'Salaries', group: 'Expenses', type: 'Other', category: 'Employee Benefits', liquid: false, opening: 0 },
+    acc11: { name: 'Internet & Utilities', group: 'Expenses', type: 'Other', category: 'Other Expenses', liquid: false, opening: 0 },
   };
   const narr = {};
   const add = (key, n) => {
@@ -324,6 +324,8 @@ function isSeededSampleBook(doc) {
       a.name !== seed.name ||
       a.group !== seed.group ||
       a.type !== seed.type ||
+      a.category !== seed.category ||
+      a.liquid !== seed.liquid ||
       (Number(a.opening) || 0) !== seed.opening
     )
       return false;

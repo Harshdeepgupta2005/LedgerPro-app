@@ -10,6 +10,8 @@ const browserGlobals = {
   console: 'readonly',
   setTimeout: 'readonly',
   clearTimeout: 'readonly',
+  setInterval: 'readonly',
+  clearInterval: 'readonly',
   confirm: 'readonly',
   Node: 'readonly',
   Store: 'readonly',

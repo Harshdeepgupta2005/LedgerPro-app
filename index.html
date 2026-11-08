@@ -95,7 +95,7 @@
       </aside>
 
       <main class="main">
-        <header class="topbar" id="topbar">
+        <header class="topbar">
           <div class="page-heading">
             <h1 id="pageTitle">Dashboard</h1>
             <p id="pageSub">Overview of your books</p>
@@ -117,7 +117,7 @@
             </button>
           </div>
           <div class="topbar-spacer">
-            <div class="topbar-cal" id="topbarCal">
+            <div class="topbar-cal">
               <button type="button" class="cal-date" id="calDateBtn" title="Change booking date (F2)">
                 <svg viewBox="0 0 24 24">
                   <rect x="4" y="5" width="16" height="16" rx="2" />
@@ -137,7 +137,7 @@
           </div>
         </header>
 
-        <div class="content" id="content">
+        <div class="content">
           <section class="view active" id="view-dashboard">
             <div class="stat-grid" id="statGrid"></div>
 
@@ -480,7 +480,7 @@
     </div>
 
     <div class="drawer-overlay" id="ledgerOverlay" hidden>
-      <aside class="drawer" id="ledgerDrawer" role="dialog" aria-modal="true" aria-labelledby="ledgerTitle">
+      <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="ledgerTitle">
         <header class="drawer-head">
           <div>
             <p class="drawer-kicker">Ledger</p>
@@ -633,7 +633,7 @@
     <div class="modal-overlay" id="dateModal" hidden>
       <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="dateModalTitle">
         <div class="modal-head">
-          <h2 id="dateModalTitle">Booking Date</h2>
+          <h2>Booking Date</h2>
           <button class="icon-btn" data-close aria-label="Close dialog">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
@@ -648,7 +648,7 @@
           <div class="modal-actions">
             <button type="button" class="btn btn-outline" data-close>Cancel</button>
             <button type="button" class="btn btn-outline" id="dateTodayBtn">Today</button>
-            <button type="submit" class="btn btn-primary" id="dateSaveBtn">Save</button>
+            <button type="submit" class="btn btn-primary">Save</button>
           </div>
         </form>
       </div>
@@ -657,7 +657,7 @@
     <div class="modal-overlay" id="periodModal" hidden>
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="periodModalTitle">
         <div class="modal-head">
-          <h2 id="periodModalTitle">Reporting Period</h2>
+          <h2>Reporting Period</h2>
           <button class="icon-btn" data-close aria-label="Close dialog">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
@@ -683,7 +683,7 @@
             <button type="button" class="btn btn-outline btn-sm" id="periodThisMonthBtn">This Month</button>
             <button type="button" class="btn btn-outline btn-sm" id="periodLastMonthBtn">Last Month</button>
             <button type="button" class="btn btn-outline btn-sm" id="periodClearBtn">All time</button>
-            <button type="submit" class="btn btn-primary" id="periodSaveBtn">Apply Period</button>
+            <button type="submit" class="btn btn-primary">Apply Period</button>
           </div>
         </form>
       </div>
@@ -692,7 +692,7 @@
     <div class="modal-overlay" id="exitModal" hidden>
       <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="exitModalTitle">
         <div class="modal-head">
-          <h2 id="exitModalTitle">Shut down LedgerPro?</h2>
+          <h2>Shut down LedgerPro?</h2>
         </div>
         <div class="modal-body">
           <p class="muted">

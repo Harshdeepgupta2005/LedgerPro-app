@@ -48,6 +48,15 @@ app.whenReady().then(async () => {
         liquid: true,
         opening: 500,
       },
+      {
+        id: 'acc2',
+        name: 'Sales',
+        group: 'Income',
+        type: 'Other',
+        category: 'Revenue from Operations',
+        liquid: false,
+        opening: 0,
+      },
     ],
     vouchers: [
       {
@@ -56,7 +65,7 @@ app.whenReady().then(async () => {
         date: '2026-01-02',
         type: 'Payment',
         dr: 'acc1',
-        cr: 'acc1',
+        cr: 'acc2',
         amount: 123.45,
         narration: 'Test',
         createdAt: '2026-01-02T10:11:12.345Z',
@@ -87,7 +96,7 @@ app.whenReady().then(async () => {
   // --- Reopen: everything still there ---
   db.open();
   const reloaded = db.load();
-  check('data survives restart', reloaded.vouchers.length === 1 && reloaded.accounts.length === 1);
+  check('data survives restart', reloaded.vouchers.length === 1 && reloaded.accounts.length === 2);
   check('createdAt survives restart', reloaded.vouchers[0].createdAt === '2026-01-02T10:11:12.345Z');
   db.close();
   await sleep(1100);
@@ -103,7 +112,7 @@ app.whenReady().then(async () => {
   db.open();
   const legacy = db.load();
   check('rows without flag count as initialized', legacy.initialized === true);
-  check('rows without flag are preserved', legacy.accounts.length === 1 && legacy.vouchers.length === 1);
+  check('rows without flag are preserved', legacy.accounts.length === 2 && legacy.vouchers.length === 1);
   db.close();
   await sleep(1100);
 

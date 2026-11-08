@@ -2,6 +2,27 @@
 
 All notable changes to LedgerPro are documented here. Semantic versioning.
 
+## [1.7.3] - 2026-11-09
+
+### Fixed
+
+- **Seed-upgrade fingerprint now compares `category` and `liquid`** — customized sample accounts (Schedule III category or liquidity flag) are no longer wrongly cleared on upgrade
+- **`db.save()` rejects self-referencing vouchers** — debit and credit accounts must be different (defense-in-depth at the database layer)
+- **Override-number edit echoes generated voucher number** — the voucher-number field now shows the auto-generated number when editing in Override mode
+- **`state.editReturnTo` declared** — added to the `state` object for static analysis clarity
+- **Storage backend label corrected** — `Store.load()` reports `localstorage` when restoring from browser storage, upgrading to `sqlite` only after a successful disk write
+- **Sub-paise amounts rejected** — voucher amounts with more than 2 decimal places are refused at entry
+
+### Added
+
+- **Auto Date update** — the booking date auto-advances to today when the calendar day changes while the app is open (dates explicitly set via F2 are respected)
+- **Section shortcuts without Esc** — sidebar letter shortcuts (d/v/g/r/a/s) work even when focus is inside a form field; the active element is blurred first
+- **Search clears on Enter** — activating a global-search result clears the search bar and hides the results panel
+
+### Cleanup
+
+- Removed dead/unused HTML `id` attributes (#topbar, #topbarCal, #content, #ledgerDrawer, #dateModalTitle, #dateSaveBtn, #periodModalTitle, #periodSaveBtn, #exitModalTitle)
+
 ## [1.7.2] - 2026-10-29
 
 ### Changed

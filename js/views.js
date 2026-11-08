@@ -12,10 +12,12 @@ const state = {
   report: null,
   entryType: 'Payment',
   editingId: null,
+  editReturnTo: null,
   ledgerId: null,
   lastSaved: null,
   lastSavedTimer: null,
   bookDate: null,
+  bookDateUserSet: false,
   period: null,
   suggest: { side: null, list: [], index: 0 },
   resultIndex: 0,
@@ -602,13 +604,22 @@ function activateGlobalResult() {
   const acc = row.dataset.resultAccount;
   if (acc) {
     hideGlobalResults();
+    clearGlobalSearch();
     openLedger(acc);
     return;
   }
   if (row.dataset.resultVoucher) {
     hideGlobalResults();
+    clearGlobalSearch();
     startEditVoucher(row.dataset.resultVoucher);
   }
+}
+
+function clearGlobalSearch() {
+  state.search = '';
+  const si = $('#searchInput');
+  if (si) si.value = '';
+  hideGlobalResults();
 }
 
 function hideGlobalResults() {

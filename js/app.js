@@ -144,6 +144,26 @@ function quitApp() {
   }
 }
 
+function startAutoDate() {
+  // Auto-advance the booking date when the calendar day changes while the app
+  // is open (e.g. left running past midnight). Only advances dates the app
+  // defaulted to today — a date explicitly chosen via the F2 booking-date
+  // modal is respected and never overwritten.
+  setInterval(() => {
+    if (state.bookDateUserSet) return;
+    const today = todayISO();
+    if (state.bookDate !== today) {
+      state.bookDate = today;
+      Prefs.setBookDate(today);
+      renderTopbarCal();
+      if (state.view === 'vouchers' && !state.editingId) {
+        const f = $('#entryForm');
+        if (f && f.date) f.date.value = today;
+      }
+    }
+  }, 60000);
+}
+
 function ensureSelectOption(select, value) {
   if (!value) return;
   const exists = Array.from(select.options).some((o) => o.value === value);
@@ -266,6 +286,7 @@ function submitEntry() {
 
   const amount = parseFloat(f.amount.value);
   if (!Number.isFinite(amount) || amount <= 0) return rejectEntry('Enter a valid amount.', f.amount);
+  if (Math.round(amount * 100) / 100 !== amount) return rejectEntry('Amount cannot have more than 2 decimal places.', f.amount);
 
   let no;
   if (state.editingId) {
@@ -273,6 +294,7 @@ function submitEntry() {
     if (mode === 'manual' && !typed) return rejectEntry('Type a voucher number.', f.no);
     const pool = Store.db.vouchers.filter((v) => v.id !== state.editingId);
     no = typed || nextVoucherNo(pool, state.entryType);
+    f.no.value = no;
     if (noExists(no)) return rejectEntry(`Voucher number ${no} already exists.`, f.no);
   } else if (mode === 'auto') {
     no = Store.nextVoucherNo(state.entryType);
@@ -599,6 +621,31 @@ function wireEvents() {
       }
     }
 
+    // Letter shortcuts (d/v/g/r/a/s) also work while focus is inside a form
+    // field — blur the active element first so the user never has to press Esc
+    // just to switch sections. This only applies when the active element is not
+    // a text input/textarea/select where the character would be typed (e.g.
+    // narration, ledger search, voucher number).
+    if (
+      !modalOpen &&
+      !state.suggest.side &&
+      e.key &&
+      e.key.length === 1 &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      typing
+    ) {
+      const ae = document.activeElement;
+      if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
+      const view = NAV_KEYS[e.key.toLowerCase()];
+      if (view && $('#ledgerOverlay').hidden) {
+        if (ae && typeof ae.blur === 'function') ae.blur();
+        showView(view);
+        return;
+      }
+    }
+
     // Alt+digit switches voucher type — but never while the user is mid-typing
     // in a field (the combo would eat the keystroke and silently switch type,
     // possibly dropping committed sides) or while a suggestion list is open.
@@ -635,6 +682,7 @@ function wireEvents() {
       return;
     }
     state.bookDate = val;
+    state.bookDateUserSet = true;
     Prefs.setBookDate(val);
     const entryForm = $('#entryForm');
     if (!state.editingId) entryForm.date.value = val;
@@ -1061,12 +1109,14 @@ function init() {
     storageLabel.textContent = Store.backend === 'sqlite' ? 'Local SQLite' : 'LocalStorage mode';
   }
   state.bookDate = Prefs.bookDate() || todayISO();
+  state.bookDateUserSet = !!Prefs.bookDate();
   state.period = Prefs.period();
   initTheme();
   wireEvents();
   syncLedgerFields({ preserve: false });
   renderTopbarCal();
   resetEntryForm();
+  startAutoDate();
   showView('dashboard');
 }
 
