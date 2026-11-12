@@ -17,7 +17,7 @@ const state = {
   lastSaved: null,
   lastSavedTimer: null,
   bookDate: null,
-  bookDateUserSet: false,
+  bookDatePinned: false,
   period: null,
   suggest: { side: null, list: [], index: 0 },
   resultIndex: 0,
@@ -600,26 +600,31 @@ function moveGlobalResults(dir) {
 
 function activateGlobalResult() {
   const row = resultRows()[state.resultIndex];
-  if (!row) return;
+  if (!row) {
+    clearGlobalSearch();
+    return;
+  }
   const acc = row.dataset.resultAccount;
   if (acc) {
-    hideGlobalResults();
     clearGlobalSearch();
     openLedger(acc);
     return;
   }
   if (row.dataset.resultVoucher) {
-    hideGlobalResults();
     clearGlobalSearch();
     startEditVoucher(row.dataset.resultVoucher);
+    return;
   }
+  clearGlobalSearch();
 }
 
 function clearGlobalSearch() {
+  const hadQuery = !!state.search;
   state.search = '';
   const si = $('#searchInput');
   if (si) si.value = '';
   hideGlobalResults();
+  if (hadQuery && (state.view === 'accounts' || state.view === 'register')) renderCurrent();
 }
 
 function hideGlobalResults() {

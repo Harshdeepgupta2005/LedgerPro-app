@@ -94,6 +94,7 @@ const browserGlobals = {
   highlightGlobalResults: 'readonly',
   moveGlobalResults: 'readonly',
   activateGlobalResult: 'readonly',
+  clearGlobalSearch: 'readonly',
   hideGlobalResults: 'readonly',
   applyNoFieldState: 'readonly',
   assignVoucherNo: 'readonly',

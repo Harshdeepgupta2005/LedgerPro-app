@@ -1,9 +1,9 @@
 # LedgerPro — Bug List & Fixes
 
 **App:** LedgerPro (Electron desktop ledger)  
-**Version:** 1.7.2  
+**Version:** 1.7.4  
 **Prepared:** 2026-11-06  
-**Updated:** 2026-11-09 (all fixes applied)
+**Updated:** 2026-11-12 (auto-date, voucher-type shortcut, and search-clearing follow-ups)
 
 ---
 
@@ -53,18 +53,19 @@ Added validation in `submitEntry()`: `Math.round(amount * 100) / 100 !== amount`
 ## New features implemented
 
 ### Feature 1: Auto Date update system ✅ IMPLEMENTED
-**Files:** `js/app.js`, `js/views.js`  
-Added `startAutoDate()` — a 60-second interval timer that checks if the calendar day has changed while the app is open. If so, it auto-advances `state.bookDate` to today's date, updates the topbar display, and refreshes the voucher form date.  
-- Only advances dates the app defaulted to today — a date explicitly chosen via the F2 booking-date modal is respected and never overwritten (`state.bookDateUserSet` flag).
-- Persists the new date to `Prefs`.
+**Files:** `js/app.js`, `js/views.js`, `js/ui.js`  
+`startAutoDate()` keeps the booking date on the current calendar day. It syncs every 30 seconds and immediately when the window regains focus or becomes visible (catching up after sleep).  
+- A date explicitly chosen via the F2 booking-date modal is stored with a `bookDatePinned` flag and respected until the user sets it back to today.
+- Choosing today in the dialog resumes automatic following.
+- The voucher form date is updated only when it still matched the previous automatic date, so in-progress edits are never clobbered.
 
-### Feature 2: Voucher navigation without pressing Esc first ✅ IMPLEMENTED
+### Feature 2: Change voucher type without pressing Esc ✅ IMPLEMENTED
 **File:** `js/app.js`  
-Added a letter-shortcut handler (d/v/g/r/a/s) that works even when focus is inside a form field. It blurs the active element first, then navigates — so the user no longer needs to press Esc to release focus before switching sections with keyboard shortcuts.
+Alt+digit (⌥1–⌥4) now switches the voucher type even while focus is inside the entry form (ledger, amount or narration) and while the ledger suggestion list is open. The suggestion list is dismissed and invalid sides are cleared safely.
 
-### Feature 3: Search bar clears after Enter on a result ✅ IMPLEMENTED
-**File:** `js/views.js`  
-`activateGlobalResult()` now calls `clearGlobalSearch()` which resets `state.search`, clears the search input value, and hides the results panel after a result is activated (Enter/click).
+### Feature 3: Search bar clears after Enter or an outside click ✅ IMPLEMENTED
+**Files:** `js/app.js`, `js/views.js`  
+Pressing Enter in the search box activates the highlighted result (if any) and always clears the query. Clicking anywhere outside the search box or results panel also clears it, including in the Accounts/Register filter views.
 
 ---
 

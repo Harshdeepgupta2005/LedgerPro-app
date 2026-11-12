@@ -2,6 +2,19 @@
 
 All notable changes to LedgerPro are documented here. Semantic versioning.
 
+## [1.7.4] - 2026-11-12
+
+### Fixed
+
+- **Booking date now follows the calendar reliably** — auto-date no longer gets stuck on the first persisted date. A dedicated `bookDatePinned` preference distinguishes an explicitly chosen date from an automatic one; the date re-syncs every 30 seconds and immediately on window focus/visibility (so it also catches up after sleep)
+- **Alt+digit switches voucher type while typing** — the shortcut now works even when focus is inside an account/amount/narration field or while the ledger suggestion list is open; suggestions are dismissed cleanly
+- **Search clears on Enter and on outside click** — pressing Enter in the search box or clicking anywhere outside it resets the query, including in the filtered Accounts/Register views
+
+### Changed
+
+- Choosing today's date in the F2 booking-date dialog resumes automatic date following; choosing another date pins it until changed
+- Added smoke-harness regression checks for auto-date, Alt+digit type switching, and search clearing
+
 ## [1.7.3] - 2026-11-09
 
 ### Fixed

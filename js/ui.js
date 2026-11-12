@@ -205,6 +205,14 @@ const Prefs = {
     this.set('bookDate', value);
   },
 
+  bookDatePinned() {
+    return this.read().bookDatePinned === true;
+  },
+
+  setBookDatePinned(value) {
+    this.set('bookDatePinned', value === true);
+  },
+
   period() {
     const p = this.read().period;
     return p && typeof p.from === 'string' && typeof p.to === 'string' ? p : null;

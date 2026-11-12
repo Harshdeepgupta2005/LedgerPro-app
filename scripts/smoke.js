@@ -176,6 +176,21 @@ app.whenReady().then(async () => {
       document.getElementById('searchClear').click();
       out.ui.searchCleared = document.getElementById('globalResults').hidden && state.search === '';
 
+      // Enter and clicking outside both clear the search box (v1.7.4)
+      si.value = 'Cash';
+      si.dispatchEvent(new Event('input', { bubbles: true }));
+      si.focus();
+      out.ui.enterSearchVisible = !document.getElementById('globalResults').hidden;
+      si.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+      out.ui.enterClearsSearch =
+        si.value === '' && state.search === '' && document.getElementById('globalResults').hidden;
+      if (state.ledgerId) closeLedger();
+      showView('dashboard');
+      si.value = 'Cash';
+      si.dispatchEvent(new Event('input', { bubbles: true }));
+      document.getElementById('pageTitle').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      out.ui.outsideClearsSearch = si.value === '' && state.search === '';
+
       // Ledger suggestions: typing in a ledger field lists matching ledgers
       showView('vouchers');
       const f2 = document.getElementById('entryForm');
@@ -199,6 +214,23 @@ app.whenReady().then(async () => {
       const tr = Array.from(document.querySelectorAll('#registerTable tbody tr'))
         .find((r) => r.querySelector('.mono') && r.querySelector('.mono').textContent.trim() === sv.no);
       out.ui.timeHidden = !!tr && !/[0-9]{1,2}:[0-9]{2}/.test(tr.querySelectorAll('td')[1].textContent.trim());
+
+      // Alt+digit switches voucher type even while an account name is being
+      // typed and the suggestion list is open (v1.7.4)
+      showView('vouchers');
+      resetEntryForm();
+      const f3 = document.getElementById('entryForm');
+      f3.dr.focus();
+      f3.dr.value = 'Ca';
+      f3.dr.dispatchEvent(new Event('input', { bubbles: true }));
+      out.ui.altSuggestOpen = !document.getElementById('drSuggest').hidden;
+      f3.dr.dispatchEvent(
+        new KeyboardEvent('keydown', { key: '2', code: 'Digit2', altKey: true, bubbles: true })
+      );
+      out.ui.altDigitSwitched = state.entryType === 'Receipt';
+      out.ui.altDigitClosedSuggest = document.getElementById('drSuggest').hidden;
+      resetEntryForm();
+      setEntryType('Payment', { keepValid: true });
 
       (function () {
         const exp = { assets: 0, liab: 0, inc: 0, expn: 0 };
@@ -239,6 +271,16 @@ app.whenReady().then(async () => {
       out.ui.bookDateLabel = document.getElementById('calDateLabel').textContent;
       resetEntryForm();
       out.ui.voucherDefaultDate = document.getElementById('entryForm').date.value;
+
+      // Auto-date follows the calendar when unpinned; a pinned date is kept.
+      state.bookDate = '1999-12-31';
+      state.bookDatePinned = false;
+      syncBookDateToToday();
+      out.ui.autoDateFollows = state.bookDate === todayISO();
+      state.bookDate = '2020-01-05';
+      state.bookDatePinned = true;
+      syncBookDateToToday();
+      out.ui.autoDatePinned = state.bookDate === '2020-01-05';
 
       // v1.3.0: Cmd+K focuses the global search
       document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK', key: 'k', metaKey: true, bubbles: true }));
@@ -433,6 +475,12 @@ out.ui.rowsNav = { rowCount, hl, any: hl === 1 && rowCount >= 2 };
   if (!u.resultsDrop) failures.push('global search dropdown did not list matching accounts');
   if (!u.resultsVisible) failures.push('global search dropdown not shown while typing');
   if (u.searchCleared !== true) failures.push('clear button did not reset the global search');
+  if (u.enterSearchVisible !== true) failures.push('global search dropdown not shown before Enter');
+  if (u.enterClearsSearch !== true) failures.push('Enter did not clear the global search');
+  if (u.outsideClearsSearch !== true) failures.push('clicking outside did not clear the global search');
+  if (u.altSuggestOpen !== true) failures.push('account suggestions did not open before Alt+digit');
+  if (u.altDigitSwitched !== true) failures.push('Alt+digit did not switch voucher type while typing');
+  if (u.altDigitClosedSuggest !== true) failures.push('Alt+digit left account suggestions open');
   if (u.suggestShown !== true || !u.suggestItems)
     failures.push(`ledger suggestions missing (shown=${u.suggestShown} items=${u.suggestItems})`);
   if (!u.suggestPicked) failures.push('suggestion select did not fill the ledger ids');
@@ -448,6 +496,8 @@ out.ui.rowsNav = { rowCount, hl, any: hl === 1 && rowCount >= 2 };
     if (u.voucherDefaultDate !== '2020-01-05')
       failures.push(`voucher default date '${u.voucherDefaultDate}' != 2020-01-05`);
   }
+  if (u.autoDateFollows !== true) failures.push('auto-date did not follow today when unpinned');
+  if (u.autoDatePinned !== true) failures.push('auto-date overwrote a pinned booking date');
   if (u.cmdKFocusedSearch !== true) failures.push('Cmd+K did not focus the global search');
   if (!u.periodModalOpened) failures.push('Cmd+F2 did not open the reporting-period popup');
   if (!u.periodExpected) failures.push('period expected values missing');

@@ -144,24 +144,33 @@ function quitApp() {
   }
 }
 
+function syncBookDateToToday() {
+  if (state.bookDatePinned) return;
+  const today = todayISO();
+  if (state.bookDate === today) return;
+  const previous = state.bookDate;
+  state.bookDate = today;
+  Prefs.setBookDate(today);
+  renderTopbarCal();
+  // Keep the entry form's date in step, but never overwrite a date the user
+  // typed by hand or the date of a voucher that is currently being edited.
+  if (!state.editingId) {
+    const f = $('#entryForm');
+    if (f && f.date && f.date.value === previous) f.date.value = today;
+  }
+}
+
 function startAutoDate() {
-  // Auto-advance the booking date when the calendar day changes while the app
-  // is open (e.g. left running past midnight). Only advances dates the app
-  // defaulted to today — a date explicitly chosen via the F2 booking-date
-  // modal is respected and never overwritten.
-  setInterval(() => {
-    if (state.bookDateUserSet) return;
-    const today = todayISO();
-    if (state.bookDate !== today) {
-      state.bookDate = today;
-      Prefs.setBookDate(today);
-      renderTopbarCal();
-      if (state.view === 'vouchers' && !state.editingId) {
-        const f = $('#entryForm');
-        if (f && f.date) f.date.value = today;
-      }
-    }
-  }, 60000);
+  // Follow the calendar automatically. A date explicitly chosen with the F2
+  // booking-date dialog is "pinned" and respected until the user sets it back
+  // to today. The quick sync on focus/visibility is what makes this reliable
+  // after the machine wakes from sleep, when interval timers may be throttled.
+  syncBookDateToToday();
+  setInterval(syncBookDateToToday, 30000);
+  window.addEventListener('focus', syncBookDateToToday);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) syncBookDateToToday();
+  });
 }
 
 function ensureSelectOption(select, value) {
@@ -646,23 +655,29 @@ function wireEvents() {
       }
     }
 
-    // Alt+digit switches voucher type — but never while the user is mid-typing
-    // in a field (the combo would eat the keystroke and silently switch type,
-    // possibly dropping committed sides) or while a suggestion list is open.
+    // Alt+digit switches voucher type. It must keep working while the user is
+    // mid-typing an account name (or any other entry field) — Alt+digit never
+    // inserts a printable character, so there is nothing to protect from the
+    // combo. Ignore it in unrelated text fields (e.g. the global search box),
+    // while editing an existing voucher, or while a modal is open.
+    const activeEl = document.activeElement;
+    const inEntryForm =
+      !!activeEl && typeof activeEl.closest === 'function' && !!activeEl.closest('#entryForm');
     if (
       e.altKey &&
       !e.metaKey &&
       !e.ctrlKey &&
       state.view === 'vouchers' &&
       !state.editingId &&
-      !typing &&
-      !state.suggest.side
+      !modalOpen &&
+      (!typing || inEntryForm)
     ) {
       let idx = -1;
       if (e.code && /^Digit[1-4]$/.test(e.code)) idx = Number(e.code.slice(5)) - 1;
       else if (['1', '2', '3', '4'].includes(e.key)) idx = Number(e.key) - 1;
       if (idx >= 0) {
         e.preventDefault();
+        hideLedgerSuggestions();
         setEntryType(['Payment', 'Receipt', 'Contra', 'Journal'][idx], { keepValid: true });
       }
     }
@@ -682,13 +697,20 @@ function wireEvents() {
       return;
     }
     state.bookDate = val;
-    state.bookDateUserSet = true;
+    // Choosing today means "follow the calendar again"; any other date is an
+    // explicit pin that the auto-date sync must leave alone.
+    state.bookDatePinned = val !== todayISO();
     Prefs.setBookDate(val);
+    Prefs.setBookDatePinned(state.bookDatePinned);
     const entryForm = $('#entryForm');
     if (!state.editingId) entryForm.date.value = val;
     closeModal($('#dateModal'));
     renderTopbarCal();
-    toast('Booking date set to ' + fmtDate(val));
+    toast(
+      state.bookDatePinned
+        ? `Booking date pinned to ${fmtDate(val)}`
+        : 'Booking date follows today'
+    );
   });
 
   $('#dateTodayBtn').addEventListener('click', () => {
@@ -993,11 +1015,20 @@ function wireEvents() {
 
   $('#searchInput').addEventListener('focus', renderGlobalResults);
 
+  // Enter activates the highlighted result (when there is one) and always
+  // clears the box. This also covers filter views, where the results panel is
+  // hidden but the query is still filtering the list below.
+  $('#searchInput').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.metaKey || e.ctrlKey || e.altKey) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!$('#globalResults').hidden) activateGlobalResult();
+    else clearGlobalSearch();
+    $('#searchInput').blur();
+  });
+
   $('#searchClear').addEventListener('click', () => {
-    $('#searchInput').value = '';
-    state.search = '';
-    hideGlobalResults();
-    if (state.view === 'accounts' || state.view === 'register') renderCurrent();
+    clearGlobalSearch();
     $('#searchInput').focus();
   });
 
@@ -1005,25 +1036,38 @@ function wireEvents() {
     e.preventDefault();
     const acc = e.target.closest('[data-result-account]');
     if (acc) {
-      hideGlobalResults();
+      clearGlobalSearch();
       openLedger(acc.dataset.resultAccount);
       return;
     }
     const vch = e.target.closest('[data-result-voucher]');
     if (vch) {
-      hideGlobalResults();
+      clearGlobalSearch();
       startEditVoucher(vch.dataset.resultVoucher);
     }
   });
 
   // The results panel is a body-level fixed element, so it also needs an
-  // explicit "click outside closes it" rule — clicking a dashboard card or any
-  // other control must not leave a results panel floating over the app.
+  // explicit "click outside clears it" rule — clicking a dashboard card or any
+  // other control must not leave a query (and its floating panel) behind.
+  // Hide on mousedown (so the panel never covers the click), but only clear
+  // on click: clearing re-renders filtered lists, which must happen after the
+  // clicked control has received its own click event.
   document.addEventListener('mousedown', (e) => {
-    const box = $('#globalResults');
-    if (!box || box.hidden) return;
-    if (box.contains(e.target) || $('#searchBox').contains(e.target)) return;
+    const searchBox = $('#searchBox');
+    if (searchBox && searchBox.contains(e.target)) return;
+    const results = $('#globalResults');
+    if (results && results.contains(e.target)) return;
     hideGlobalResults();
+  });
+  document.addEventListener('click', (e) => {
+    const searchBox = $('#searchBox');
+    if (searchBox && searchBox.contains(e.target)) return;
+    const results = $('#globalResults');
+    if (results && results.contains(e.target)) return;
+    const input = $('#searchInput');
+    if (!state.search && (!input || !input.value)) return;
+    clearGlobalSearch();
   });
 
   // The panel is anchored to the search box rect; re-anchor when the window
@@ -1108,8 +1152,9 @@ function init() {
   if (storageLabel) {
     storageLabel.textContent = Store.backend === 'sqlite' ? 'Local SQLite' : 'LocalStorage mode';
   }
-  state.bookDate = Prefs.bookDate() || todayISO();
-  state.bookDateUserSet = !!Prefs.bookDate();
+  const pinnedDate = Prefs.bookDate();
+  state.bookDatePinned = Prefs.bookDatePinned() && !!pinnedDate;
+  state.bookDate = (state.bookDatePinned && pinnedDate) || todayISO();
   state.period = Prefs.period();
   initTheme();
   wireEvents();
